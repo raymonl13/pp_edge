@@ -1,0 +1,17 @@
+{
+  "date": "2025-05-05",
+  "source": "Sample",
+  "projections": [
+    {
+      "player": "John Doe",
+      "team": "SFG",
+      "opponent": "TEX",
+      "stat_type": "Hits",
+      "line": 1.5,
+      "over_odds": -115,
+      "under_odds": -115,
+      "included": true,
+      "notes": "Placeholder projection for demo"
+    }
+  ]
+}

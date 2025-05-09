@@ -1,0 +1,211 @@
+##############################################
+#  PP-EDGE MLB v6.7  –  Daily PrizePicks Engine
+#  (auto-recalibrated • env-gates • Demon caps •
+#   rolling-form blend • drift & bias self-heal)
+##############################################
+
+user_input:
+  date: 2025-04-23           # ← change daily
+  bankroll: 100
+  kelly_fraction_default: 0.50
+  postmortem_json: ""        # paste last night’s PM JSON or leave ""
+
+# 0 ▪ ENV & LOGGING
+env:
+  PP_API_KEY:      "<PP_KEY>"
+  STATCAST_KEY:    "<STATCAST_KEY>"
+  FG_STUFF_KEY:    "<FG_KEY>"
+  DFS_WS_TOKEN:    "<DFS_KEY>"
+  ROOF_API_KEY:    "<ROOF_KEY>"
+logging:
+  version_tag: auto-v6.7
+  hash_payloads: true
+
+# 1 ▪ FEEDS  – **read from the local JSON produced by the scraper**
+feeds:
+  - {name: odds_raw,   source: "file://live_feeds_${date}.json?key=props"}
+  - {name: board,      source: "file://live_feeds_${date}.json?key=board"}
+  - {name: lines_full, source: "file://live_feeds_${date}.json?key=lines_full"}
+
+  # context / status (included in the same JSON)
+  - {name: roof,       source: "file://live_feeds_${date}.json?key=roof"}
+  - {name: roster26,   source: "file://live_feeds_${date}.json?key=roster"}
+  - {name: trans,      source: "file://live_feeds_${date}.json?key=transactions"}
+  - {name: probables,  source: "file://live_feeds_${date}.json?key=probables"}
+  - {name: lineups,    source: "file://live_feeds_${date}.json?key=lineups"}
+  - {name: wx,         source: "file://live_feeds_${date}.json?key=weather"}
+
+  # static / internal feeds (read the same as before)
+  - {name: park,       source: statcast_pf}
+  - {name: ump,        source: umpscorecards}
+  - {name: pen,        source: mlb_stats}
+  - {name: sc30,       source: statsapi}
+  - {name: stuff,      source: fg_enosarris_csv}
+  - {name: career,     source: fangraphs_api}
+  - {name: outcomes7,  source: "/outcomes?days=7&sport=MLB"}
+  - {name: outcomes30, source: "/outcomes?days=30&sport=MLB"}
+
+# 1a ▪ VARIANT / TRUE-LINE RESOLUTION
+variant_resolver:
+  join_key: prop_id
+  icon_field: board.icon_id            # 0 Std | 1 Goblin | 2 Demon
+  true_line_field: lines_full.threshold
+  rules:
+    if icon_field == 2: line = true_line_field
+    else:               line = odds_raw.line
+
+sanity_gate:
+  - desc: Demon icon but line≈house
+    code: |
+      if icon_field == 2 and abs(line - odds_raw.line) < 1:
+          drop("Un-resolved Demon threshold")
+
+# 1b ▪ CORE FILTERS
+filters:
+  - desc: Active roster / no IL / leave
+    code: |
+      if player_id not in roster26 or player_id in trans.IL or \
+         trans.list_reason in ["Paternity","Bereavement"]:
+        drop()
+  - desc: Hitter lineup confirmation (≥95 %)
+    code: |
+      if prop_type in ["Hits","TotalBases","HR","Hits+Runs+RBIs","FantasyScore"] \
+         and player_id not in lineups:
+        drop()
+  - desc: SP prop requires listed probable
+    code: |
+      if prop_type in ["Strikeouts","Outs","EarnedRuns","Walks"] \
+         and player_id not in probables:
+        drop()
+  - desc: Board presence
+    code: if prop_id not in board or prop_id not in odds_raw: drop()
+
+# 1c ▪ HARD GATES / ENV-SENTINELS
+hard_gates:
+  - desc: HR/TB Demon-Moon safety
+    code: |
+      if variant == "Demon-Moon" and prop_type in ["HR","TotalBases"] and \
+         (barrel_pct < 18 or wind_pf <= 1.05 or model_edge_pp < 8):
+        drop()
+  - desc: Walks/ER Demon-Floor min-edge
+    code: |
+      if variant == "Demon-Floor" and prop_type in ["Walks","EarnedRuns"] \
+         and model_edge_pp < 4:
+        drop()
+  - desc: Weather / roof mismatch
+    code: |
+      if variant.startswith("Demon") and bad_wx_flag:
+        drop()
+
+# 2 ▪ BAYESIAN PROJECTION ENGINE
+bayesian_update:
+  priors:
+    long_term: {mu: career_mean, n: 200}
+    form30:    {mu: outcomes30.mean, n: 60}
+    form7:     {mu: outcomes7.mean,  n: 20}
+  covariates_extra:
+    - stuff_plus
+    - location_plus
+    - wind_speed
+    - wind_pf
+    - last_start_GSIP
+    - velo_delta
+  bias_correction:
+    Demon_Moon:  -0.10
+    Demon_Floor: -0.05
+    Goblin:       0.02
+    Standard:     0.00
+
+# 3 ▪ PROP-TYPE DIRECTION MAP
+prop_direction:
+  Strikeouts:        higher_is_good
+  Outs:              higher_is_good
+  EarnedRuns:        lower_is_good
+  Walks:             lower_is_good
+  HR:                higher_is_good
+  TotalBases:        higher_is_good
+  Hits:              higher_is_good
+  Hits+Runs+RBIs:    higher_is_good
+  FantasyScore:      higher_is_good
+  StolenBases:       higher_is_good
+
+# 4 ▪ CALIBRATION / RECENT-PERF OVERLAY
+calibration:
+  method: isotonic
+  eval_window_days: 30
+  blend_recent_weight: 0.35
+  postmortem_bias_merge: true
+
+# 5 ▪ DIVERSIFICATION / QUOTAS
+diversification:
+  kendall_tau: true
+  slip_rho_cap: 0.40
+  stat_mix_cap: 2
+  game_cap: 2
+  one_player_per_slip: true
+  one_icon_per_player_per_day: true
+  demon_moon_max_per_slip: 1
+  demon_floor_max_per_slip: 1
+
+# 6 ▪ BANKROLL / ENTRY SHAPER
+bankroll_rules:
+  base_single_cap: 0.03
+  power_stake_factor: 0.30
+  daily_cap: 0.30
+weather_sigma_dial:
+  if_wind_sigma_gt: 7
+  scale_tb_hr_demon: 0.50
+entry_structure_optimizer:
+  if_projected_hit_rate_lt: 0.18: flex
+  else: power
+
+# 7 ▪ SLIP BLUEPRINTS
+slip_blueprints:
+  PP4:   {legs: 4, type: power, rules: {min_goblin: 1, max_demon: 1}}
+  PP6F:  {legs: 6, type: flex,  rules: {min_goblin: 2, max_demon: 2}}
+  Hybrid:{legs: 6, type: flex,  rules: {min_goblin: 3, max_demon: 2}}
+  DFloor:{legs: 6, type: flex,  rules: {all_demon_floor: true, max_same_player: 1}}
+  DMoon: {legs: 6, type: power, rules: {all_demon_moon: true, stake_pct: 0.02}}
+
+# 8 ▪ MONTE-CARLO VaR / TAIL-RISK
+monte_carlo:
+  sims: 50000
+  stop_loss_day: -0.35
+
+# 9 ▪ LIVE RE-PRICE / DRIFT  (T-30)
+live_reprice:
+  t_minus: 30
+  reping_endpoint: "/props?date={date}&sport=MLB"
+  roof_recheck: roof
+  drift_alert_threshold: 0.10
+  action_on_drift: swap_or_void
+  rerun_diversification: true
+
+#10 ▪ FINAL AUDIT (T-15)
+final_audit:
+  time_cutoff: 15
+  verify_lineups: true
+  verify_probables: true
+  roof_recheck: true
+  enforce_diversification: true
+  action_if_violation: swap_or_void_leg
+
+#11 ▪ OUTPUT
+output:
+  mode: slips_only
+  risk_summary: true
+  format: markdown
+  extra_sections:
+    - name: active_demon_board
+      content: |
+        ### Live Demon Board ({{date}})
+        | Player | Team | Prop | True Line | Confirmed Line-up? |
+        |--------|------|------|-----------|--------------------|
+        {% for p in all_props if p.icon_id == 2 %}
+        | {{p.player}} | {{p.team}} | {{p.stat}} | {{p.true_line}} | \
+          {{'Yes' if p.player in lineups else '—'}} |
+        {% endfor %}
+
+##############################################
+# END v6.7 YAML  – save as pp_edge_v6.7.yaml
+##############################################

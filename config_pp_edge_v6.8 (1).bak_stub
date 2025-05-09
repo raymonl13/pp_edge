@@ -1,0 +1,10 @@
+# --- v6.8 M2: leg payouts & Kelly --------------------------------
+leg_payouts:                # site-quoted payout for a single leg
+  default: 1.50             # standard PrizePicks “flex” leg
+  promo_boost: 1.80         # example boosted line
+
+kelly:
+  use_fraction: 0.50        # half-Kelly for safety
+  max_fraction: 0.02        # ≤2 % of bankroll on any one leg
+  bankroll_json: data/bankroll.json
+  rounding: nearest_dollar  # how to display stake

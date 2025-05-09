@@ -1,0 +1,24 @@
+{
+  "legs": [
+    {
+      "player": "A",
+      "stat": "Hits",
+      "game_id": "G1"
+    },
+    {
+      "player": "B",
+      "stat": "Hits",
+      "game_id": "G1"
+    },
+    {
+      "player": "C",
+      "stat": "Hits",
+      "game_id": "G1"
+    },
+    {
+      "player": "D",
+      "stat": "Hits",
+      "game_id": "G1"
+    }
+  ]
+}
