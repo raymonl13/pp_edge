@@ -92,3 +92,23 @@ kelly_fraction_used	After safety dials
 stake_units	Dollars/units risked
 bankroll_before	Balance before stake
 status	pending → won/lost
+
+6 Code-cell Convention
+# — no inline comments —
+<clean command 1>
+<clean command 2>
+<clean command 3>
+(Closing heredocs or JSON blocks follow the same minimal style.)
+
+Context checklist (always immediately below the code block)
+Step 1 Describe what <clean command 1> does.
+
+Step 2 Describe what <clean command 2> does.
+
+Step 3 Describe what <clean command 3> does.
+
+
+
+## GitHub as Single Source of Truth
+- **Start each session or Colab notebook** with Already up to date. to sync the latest code.
+- **After pushing changes**, run  in Colab to fetch updates before running any cells.
