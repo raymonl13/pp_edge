@@ -1,13 +1,12 @@
-import numpy as np
+"""
+Advanced Hit-Probability Model v1
+Spec: docs_hit_prob_v1_spec.md
+"""
+
 from pathlib import Path
-import joblib
+from typing import Optional
+import pandas as pd
+import numpy as np
 
-MODEL_PATH = Path('model_assets/model_v1.pkl')
-
-def predict_hit_prob(df, model_path: Path | None = None):
-    """Return np.ndarray of p_hit for rows in *df*.
-    Expects df already has final feature columns used in training.
-    """
-    mp = model_path or MODEL_PATH
-    model = joblib.load(mp)
-    return model.predict(df.fillna(0))
+def predict_hit_prob(df: pd.DataFrame, model_path: Optional[Path] = None) -> np.ndarray:
+    raise NotImplementedError("see docs_hit_prob_v1_spec.md")
