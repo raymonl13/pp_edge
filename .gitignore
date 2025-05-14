@@ -1,3 +1,4 @@
 /data/
 /model_assets/*.pkl
 !data/raw/*.csv
+!data/raw/*.csv
