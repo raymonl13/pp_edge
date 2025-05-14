@@ -1,7 +1,7 @@
 name: PP-EDGE CI
 
 on:
-  push:
+  push: { branches: [ "**" ] }
     branches: [main]
   pull_request:
     branches: [main]
