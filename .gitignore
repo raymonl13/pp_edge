@@ -2,3 +2,9 @@
 /model_assets/*.pkl
 !data/raw/*.csv
 !data/raw/*.csv
+!data/raw/*.csv # allow sample CSVs through ignore
+
+# keep CI sample CSVs
+!data/
+!data/raw/
+!data/raw/*.csv
