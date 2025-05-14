@@ -3,14 +3,13 @@ from code_utils_model_v1 import predict_hit_prob
 PP-EDGE Core v6.7 · Milestone 5
 price → filter by edge → build slips → Kelly sizing
 """
-from code_utils_prob_v1 import bayes_hit_prob
 from code_utils_slipbuilder_v1 import SlipBuilder
 from code_utils_bankroll_v1 import size_bet
 
 def _price(raw_legs, payout):
     out = []
     for leg in raw_legs:
-        p = bayes_hit_prob(leg)
+        p = predict_hit_prob(leg)
         edge = round(p * payout - 1.0, 4)
         out.append({**leg, "p_hit": round(p,4), "edge_pp": edge})
     return out
