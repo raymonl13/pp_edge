@@ -1,7 +1,8 @@
-<<<<<<< HEAD
 {
-  "legs": []
+  "legs": [
+    {"player":"A","team":"NYY","stat":"Hits"},
+    {"player":"B","team":"LAD","stat":"Hits"},
+    {"player":"C","team":"HOU","stat":"Hits"},
+    {"player":"D","team":"ATL","stat":"Hits"}
+  ]
 }
-=======
-{"legs": [{"player": "A", "team": "NYY", "stat": "Hits"}, {"player": "B", "team": "LAD", "stat": "Hits"}, {"player": "C", "team": "HOU", "stat": "Hits"}, {"player": "D", "team": "ATL", "stat": "Hits"}]}
->>>>>>> feat/hit-prob-v1
