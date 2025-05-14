@@ -1,5 +1,5 @@
 demo_slip_input: demo_slipbuilder_input.json
-statcast_with_parks: data/raw/statcast_with_parks.csv
+park_factors: data/raw/park_factors.csv
 statcast_2024: data/raw/statcast_2024.csv
 statcast_2025: data/raw/statcast_2025.csv
-park_factors: data/raw/park_factors.csv
+statcast_with_parks: data/raw/statcast_with_parks.csv
