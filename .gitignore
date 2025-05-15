@@ -8,3 +8,8 @@
 !data/
 !data/raw/
 !data/raw/*.csv
+
+# CI sample CSVs
+!data/
+!data/raw/
+!data/raw/*.csv
