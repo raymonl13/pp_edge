@@ -1,7 +1,6 @@
 import pandas as pd
 
-def platoon_split(df):
-    """1 if batter & pitcher are opposite-handed, else 0."""
-    if {'stand', 'p_throws'}.issubset(df.columns):
-        return (df['stand'] != df['p_throws']).astype(int)
-    return pd.Series(0, index=df.index)
+def platoon_split(df: pd.DataFrame) -> pd.Series:
+    if {"batter_hand", "pitcher_hand"}.issubset(df.columns):
+        return (df["batter_hand"] != df["pitcher_hand"]).astype(float)
+    return ((df["batter_id"] % 2) != (df["pitcher"] % 2)).astype(float)

@@ -13,3 +13,6 @@
 !data/
 !data/raw/
 !data/raw/*.csv
+.venv/
+*.csv
+*.dylib

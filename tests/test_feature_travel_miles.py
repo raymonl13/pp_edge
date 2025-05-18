@@ -1,5 +1,5 @@
 import pandas as pd, numpy as np
-from features_travel_miles import travel_miles
+from features.travel_miles import travel_miles
 
 def _row(date, lat, lon):
     return {"game_date": pd.to_datetime(date),
