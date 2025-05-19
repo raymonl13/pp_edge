@@ -1,34 +1,23 @@
 name: Fixture Smoke
-
 on:
   push:
   pull_request:
-
 jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Install pandas only
-        run: |
-          pip install pandas
-
-      # If you prefer the full requirements, replace the block above with:
-      # - run: pip install -r requirements.txt
-
-      - name: Check CSV columns
+      - run: pip install pandas
+      - name: Check Statcast CSV columns
         run: |
           python - <<'PY'
           import pandas as pd, glob, sys, json
           REQ = {"barrel","batter","pitcher","description","home_team"}
           failed = []
-          for csv in glob.glob("data/raw/*.csv"):
+          for csv in glob.glob("data/raw/statcast_*.csv"):
               cols = set(pd.read_csv(csv, nrows=0).columns)
               missing = REQ - cols
               if missing:
