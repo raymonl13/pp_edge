@@ -9,6 +9,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install pandas only
+        run: |
+          pip install pandas
+
+      # If you prefer the full requirements, replace the block above with:
+      # - run: pip install -r requirements.txt
+
       - name: Check CSV columns
         run: |
           python - <<'PY'
