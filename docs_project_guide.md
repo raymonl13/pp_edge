@@ -117,3 +117,8 @@ Step 3 Describe what <clean command 3> does.
 * All sample data lives under `data/raw/` and is **un-ignored** in `.gitignore`.
 * Every CSV must carry columns required by current feature functions.
 * The workflow’s “fixture-smoke” step fails if a required column disappears.
+
+### Edge-Filter & Tagging Rules
+* Edge threshold configurable in .
+* **Demon** tag → edge ≥ 0.05 and p_hit ≥ 0.75.
+* **Goblin** tag → edge ≥ 0.03 and p_hit ≥ 0.65.
