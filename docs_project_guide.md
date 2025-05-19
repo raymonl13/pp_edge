@@ -110,10 +110,15 @@ Step 3 Describe what <clean command 3> does.
 
 
 ## GitHub as Single Source of Truth
-- **Start each session or Colab notebook** with Already up to date. to sync the latest code.
-- **After pushing changes**, run  in Colab to fetch updates before running any cells.
+- **Start each session or Colab notebook** with git pull origin main to sync the latest code.
+- **After pushing changes**, !git pull origin main to fetch updates before running any cells.
 
 ### CI Fixture Rules
 * All sample data lives under `data/raw/` and is **un-ignored** in `.gitignore`.
 * Every CSV must carry columns required by current feature functions.
 * The workflow’s “fixture-smoke” step fails if a required column disappears.
+
+### Edge-Filter & Tagging Rules
+* Thresholds configurable in `config_pp_edge_v6.8.yaml`.
+* **Demon** tag → edge ≥ 0.05 and p_hit ≥ 0.75.  
+* **Goblin** tag → edge ≥ 0.03 and p_hit ≥ 0.65.
