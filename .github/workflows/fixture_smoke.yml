@@ -1,19 +1,26 @@
 name: Fixture Smoke
-on: [push, pull_request]
+
+on:
+  push:
+  pull_request:
+
 jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: python - <<'PY'
-import pandas as pd, glob, sys, json, pathlib
-REQ = {"barrel","batter","pitcher","description","home_team"}
-failed = []
-for csv in glob.glob("data/raw/*.csv"):
-    cols = set(pd.read_csv(csv,nrows=0).columns)
-    missing = REQ - cols
-    if missing:
-        failed.append({"file":csv,"missing":sorted(missing)})
-if failed:
-    print(json.dumps(failed,indent=2)); sys.exit(1)
-PY
+      - name: Check CSV columns
+        run: |
+          python - <<'PY'
+          import pandas as pd, glob, sys, json
+          REQ = {"barrel","batter","pitcher","description","home_team"}
+          failed = []
+          for csv in glob.glob("data/raw/*.csv"):
+              cols = set(pd.read_csv(csv, nrows=0).columns)
+              missing = REQ - cols
+              if missing:
+                  failed.append({"file": csv, "missing": sorted(missing)})
+          if failed:
+              print(json.dumps(failed, indent=2))
+              sys.exit(1)
+          PY
