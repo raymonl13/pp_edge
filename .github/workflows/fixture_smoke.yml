@@ -1,7 +1,9 @@
 name: Fixture Smoke
+
 on:
   push:
   pull_request:
+
 jobs:
   smoke:
     runs-on: ubuntu-latest
@@ -25,5 +27,4 @@ jobs:
           if failed:
               print(json.dumps(failed, indent=2))
               sys.exit(1)
-          PY
           PY
