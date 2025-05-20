@@ -26,3 +26,4 @@ jobs:
               print(json.dumps(failed, indent=2))
               sys.exit(1)
           PY
+          PY
