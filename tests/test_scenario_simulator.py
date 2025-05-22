@@ -1,4 +1,4 @@
-import pandas as pd
+import pandas as pd, pytest
 from scripts.scenario_simulator import simulate
 
 def test_simulate_scenario():
