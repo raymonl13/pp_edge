@@ -1,0 +1,19 @@
+name: nightly_edge_sheet
+on:
+  schedule:
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+jobs:
+  edge-sheet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - run: pip install -r requirements.txt
+      - run: python run_edge_sheet.py --date $(date -u +%F)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: edge_sheet_$(date -u +%F).csv
+          path: edge_sheet_$(date -u +%F).csv
