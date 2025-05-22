@@ -52,3 +52,4 @@ data:
   weather_cache: data/cache/
 model_assets:
   hit_prob_v1: model_assets/model_v1.pkl
+min_edge_pp: 0.05
