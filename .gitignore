@@ -4,3 +4,8 @@ data/
 model_assets/
 *.csv
 *.json
+.env
+.venv/
+*.yml
+barrel_pct.py
+tmp_cfg
