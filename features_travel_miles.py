@@ -1,19 +1,16 @@
-
 import pandas as pd, numpy as np
-
-def _haversine(lat1, lon1, lat2, lon2):
-    r=3958.8
-    lat1=np.radians(lat1); lat2=np.radians(lat2)
-    dlat=lat2-lat1
-    dlon=np.radians(lon2-lon1)
-    a=np.sin(dlat/2)**2+np.cos(lat1)*np.cos(lat2)*np.sin(dlon/2)**2
-    return r*2*np.arcsin(np.sqrt(a))
-
+from math import radians, sin, cos, sqrt, atan2
+_R=3958.8
+def _h(lat1,lon1,lat2,lon2):
+    dlat=radians(lat2-lat1);dlon=radians(lon2-lon1)
+    a=sin(dlat/2)**2+cos(radians(lat1))*cos(radians(lat2))*sin(dlon/2)**2
+    return 2*_R*atan2(sqrt(a),sqrt(1-a))
 def travel_miles(df:pd.DataFrame)->pd.Series:
-    d=df[['team','game_date','park_lat','park_lon']].copy()
-    d.sort_values(['team','game_date'],inplace=True)
-    d['prev_lat']=d.groupby('team')['park_lat'].shift()
-    d['prev_lon']=d.groupby('team')['park_lon'].shift()
-    miles=_haversine(d['prev_lat'],d['prev_lon'],d['park_lat'],d['park_lon']).fillna(0.0)
-    return miles.reindex(df.index).astype(float).rename('travel_miles')
-
+    df=df.sort_values(["team","game_date"]).reset_index(drop=True)
+    miles=np.zeros(len(df))
+    for team,g in df.groupby("team"):
+        lat,lon=g["park_lat"].values,g["park_lon"].values
+        idx=g.index
+        seg=[_h(lat[i-1],lon[i-1],lat[i],lon[i]) for i in range(1,len(lat))]
+        miles[idx[1:]]=seg
+    return pd.Series(miles,index=df.index)
