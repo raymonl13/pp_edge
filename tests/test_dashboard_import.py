@@ -1,3 +1,3 @@
-def test_dashboard_import():
+def test_streamlit_import():
     import importlib
-    importlib.import_module('dashboard.app')
+    assert importlib.import_module("dashboard.app")
