@@ -151,3 +151,31 @@ Step 3 Describe what <clean command 3> does.
 * Weekly retrain workflow `.github/workflows/nightly_retrain.yml` runs every Monday 09:00 UTC.
 * Drift alert: Slack ping if AUC ↓ > 0.03 or KS > 0.05.
 
+## Data ingest v2
+`code_data_ingest_statcast_v2.py`
+```bash
+python code_data_ingest_statcast_v2.py --season 2025
+python code_data_ingest_statcast_v2.py --days 90
+
+
+`code_data_ingest_statcast_v2.py`
+```bash
+python code_data_ingest_statcast_v2.py --season 2025
+python code_data_ingest_statcast_v2.py --days 90
+
+
+
+`train_hit_prob_v2.py`
+```bash
+python train_hit_prob_v2.py --days 90 --grid
+Outputs model_assets/model_v2.pkl.
+`train_hit_prob_v2.py`
+```bash
+python train_hit_prob_v2.py --days 90 --grid
+Outputs model_assets/model_v2.pkl.
+### Model v2 training
+\`train_hit_prob_v2.py\`
+
+    python train_hit_prob_v2.py --days 90 --grid
+
+Outputs \`model_assets/model_v2.pkl\`.
