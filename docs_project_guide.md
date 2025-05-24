@@ -157,13 +157,11 @@ Step 3 Describe what <clean command 3> does.
 python code_data_ingest_statcast_v2.py --season 2025
 python code_data_ingest_statcast_v2.py --days 90
 
-
-`code_data_ingest_statcast_v2.py`
+`calibrate_hit_prob.py`
 ```bash
-python code_data_ingest_statcast_v2.py --season 2025
-python code_data_ingest_statcast_v2.py --days 90
-
-
+python calibrate_hit_prob.py --raw-dir data/raw
+```
+utils/drift_alert.py — daily job compares new-vs-old probabilities (AUC, KS) and posts a Slack alert when drift exceeds thresholds.
 
 `train_hit_prob_v2.py`
 ```bash
@@ -186,3 +184,9 @@ and saves `model_assets/calibration_params_v2.yaml`.
     python calibrate_hit_prob.py
 
 Outputs YAML + prints path. Drift util in `utils/drift_alert.py`.
+
+`calibrate_hit_prob.py`
+```bash
+python calibrate_hit_prob.py --raw-dir data/raw 
+```
+utils/drift_alert.py — daily job compares new-vs-old probabilities (AUC, KS) and posts a Slack alert when drift exceeds thresholds.
