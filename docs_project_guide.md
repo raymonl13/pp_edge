@@ -179,3 +179,10 @@ Outputs model_assets/model_v2.pkl.
     python train_hit_prob_v2.py --days 90 --grid
 
 Outputs \`model_assets/model_v2.pkl\`.
+### Calibration & Drift
+`calibrate_hit_prob.py` loads `model_v2.pkl`, fits isotonic (fallback Platt),
+and saves `model_assets/calibration_params_v2.yaml`.
+
+    python calibrate_hit_prob.py
+
+Outputs YAML + prints path. Drift util in `utils/drift_alert.py`.
