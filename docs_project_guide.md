@@ -177,3 +177,7 @@ utils/drift_alert.py — daily job compares new-vs-old probabilities
     .github/workflows/nightly_retrain.yml
     Ingest → train → calibrate → SHA-hash → upload artefacts → Slack ping
     Secrets: RUN_FULL_TRAIN, PPEDGE_WEBHOOK
+### Nightly Retrain Workflow (Phase 4)
+.github/workflows/nightly_retrain.yml  runs Monday 09 UTC  
+Ingest → train → calibrate → upload artifacts → Slack ping  
+Secrets required: SLACK_WEBHOOK, PP_EDGE_TEST_MODE (true on PRs).
