@@ -173,3 +173,7 @@ calibrate_hit_prob.py loads **model_v2.pkl**, fits isotonic scaling
 utils/drift_alert.py — daily job compares new-vs-old probabilities  
 (AUC, KS) and posts a Slack alert when drift thresholds are exceeded.
  origin/main
+### Nightly Retrain Workflow (Phase 4)
+    .github/workflows/nightly_retrain.yml
+    Ingest → train → calibrate → SHA-hash → upload artefacts → Slack ping
+    Secrets: RUN_FULL_TRAIN, PPEDGE_WEBHOOK
