@@ -153,21 +153,23 @@ Step 3 Describe what <clean command 3> does.
 
 ## Data ingest v2
 `code_data_ingest_statcast_v2.py`
+### Data ingest v2  
+code_data_ingest_statcast_v2.py  
 
     python code_data_ingest_statcast_v2.py --season 2025
     python code_data_ingest_statcast_v2.py --days 90
 
-### Calibration & Drift
-`calibrate_hit_prob.py` loads `model_v2.pkl`, fits isotonic scaling (fallback
-Platt), and writes `model_assets/calibration_params_v2.yaml`.
-
-    python calibrate_hit_prob.py --raw-dir data/raw
-
-`utils/drift_alert.py` — daily job compares new-vs-old probabilities (AUC, KS)
-and posts a Slack alert when drift exceeds thresholds.
-
-### Model v2 training
-`train_hit_prob_v2.py`
+### Model v2 training  
+train_hit_prob_v2.py  
 
     python train_hit_prob_v2.py --days 90 --grid    # writes model_assets/model_v2.pkl
 
+### Calibration & Drift  
+calibrate_hit_prob.py loads **model_v2.pkl**, fits isotonic scaling  
+(fallback Platt) and writes **model_assets/calibration_params_v2.yaml**.
+
+    python calibrate_hit_prob.py --raw-dir data/raw
+
+utils/drift_alert.py — daily job compares new-vs-old probabilities  
+(AUC, KS) and posts a Slack alert when drift thresholds are exceeded.
+ origin/main
