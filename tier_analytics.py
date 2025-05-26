@@ -1,7 +1,7 @@
 #!/usr/bin/env python3\nprint("Tier analytics stub")
 import csv, pathlib, statistics, json, typing as _t
 
-def _read_slips(csv_path: str | pathlib.Path) -> _t.Iterator[dict]:
+def _read_slips(csv_path: typing.Union[str, pathlib.Path]) -> typing.Iterator[dict]:
     with open(csv_path, newline="") as f:
         for row in csv.DictReader(f):
             row["stake"]  = float(row["stake"])
