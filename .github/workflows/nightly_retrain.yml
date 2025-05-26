@@ -1,36 +1,49 @@
+---
 name: Nightly Retrain (Mon 09 UTC)
+
 on:
   schedule:
-    - cron: "0 9 * * 1"
+    - cron: "0 9 * * 1"      # every Monday 09:00 UTC
   workflow_dispatch:
+
 jobs:
   retrain:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.9"
+
       - name: Install deps
         run: |
-          python -m pip install -q --upgrade pip
+          python -m pip install -q --upgrade pip && \
           pip install -q -r requirements.txt
+
       - name: Ingest 90-day Statcast
         run: python code_data_ingest_statcast_v2.py --days 90
+
       - name: Train model v2
         run: python train_hit_prob_v2.py --days 90 --grid
+
       - name: Calibrate model
         run: python calibrate_hit_prob.py --raw-dir data/raw
-      - uses: actions/upload-artifact@v4
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
         with:
           name: model_assets
           path: |
             model_assets/model_v2.pkl
             model_assets/calibration_params_v2.yaml
+
       - name: Slack notify
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
         run: |
-          [ -n "$SLACK_WEBHOOK" ] && curl -X POST -H "Content-Type: application/json" \
-            --data "{\"text\":\"Nightly retrain ${{ job.status }}\"}" "$SLACK_WEBHOOK"
+          [ -n "$SLACK_WEBHOOK" ] && \
+          curl -X POST -H 'Content-Type: application/json' \
+               --data "{\"text\":\"Nightly retrain ${{ job.status }} :rocket:\"}" \
+               "$SLACK_WEBHOOK"
 
