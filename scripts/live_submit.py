@@ -12,7 +12,7 @@ def main():
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
     resp = requests.post(url, json=payload, headers=headers, timeout=10)
     resp.raise_for_status()
-    print(resp.text)
+    print(getattr(resp, "text", ""))
     return 0
 
 if __name__ == "__main__":
