@@ -1,0 +1,15 @@
+---
+name: Daily Dry-Run (10 UTC)
+on:
+  schedule:
+    - cron: "0 10 * * *"
+  workflow_dispatch: {}
+jobs:
+  dryrun:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+      - run: python scripts/dry_run_submit.py
