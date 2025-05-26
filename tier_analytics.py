@@ -1,3 +1,4 @@
+import typing
 #!/usr/bin/env python3\nprint("Tier analytics stub")
 import csv, pathlib, statistics, json, typing as _t
 
