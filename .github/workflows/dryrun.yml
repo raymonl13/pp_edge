@@ -1,15 +1,31 @@
 ---
 name: Daily Dry-Run (10 UTC)
+
 on:
   schedule:
-    - cron: "0 10 * * *"
-  workflow_dispatch: {}
+    - cron: "0 10 * * *" 
+  workflow_dispatch:
+
 jobs:
   dryrun:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.9"
-      - run: python scripts/dry_run_submit.py
+
+      - name: Run dry-run submit
+        run: python scripts/dry_run_submit.py
+
+      - name: Slack notify
+        env:
+          PPEDGE_WEBHOOK: ${{ secrets.PPEDGE_WEBHOOK }}
+        run: |
+          STATUS="${{ job.status }}"
+          if [ -n "$PPEDGE_WEBHOOK" ]; then
+            curl -X POST -H "Content-Type: application/json" \
+              --data "{\"text\":\"Daily dry-run *${STATUS}* :test_tube:\"}" \
+              "$PPEDGE_WEBHOOK"
+          fi
