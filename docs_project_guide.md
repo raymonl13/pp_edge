@@ -176,3 +176,6 @@ utils/drift_alert.py — daily job compares new-vs-old probabilities
 .github/workflows/nightly_retrain.yml — runs Monday 09 UTC  
 Ingest → train → calibrate → upload artifacts → Slack ping  
 Secrets: SLACK_WEBHOOK, PP_EDGE_TEST_MODE (true on PRs)
+### Live Submit Flow (Phase 6)
+`scripts/live_submit.py` test mode prints payload, live mode posts.
+Workflow: `.github/workflows/live_submit.yml`
