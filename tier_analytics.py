@@ -9,16 +9,26 @@ def _read_slips(csv_path: typing.Union[str, pathlib.Path]) -> typing.Iterator[di
             row["payout"] = float(row["payout"])
             yield row
 
-def _aggregate(rows: _t.Iterable[dict]) -> dict:
-    agg: dict[str, dict[str, float]] = {}
+def _aggregate(rows: typing.Iterable[dict]) -> list[tuple]:
+    """
+    Return list of tuples:
+    (idx, tier, total, won, lost, stake, pnl), alphabetically by tier.
+    """
+    tmp: dict[str, dict[str, float]] = {}
     for r in rows:
         t = r["tier"]
-        a = agg.setdefault(t, {"won": 0, "lost": 0, "stake": 0.0, "pl": 0.0})
+        a = tmp.setdefault(t, {"total": 0, "won": 0, "lost": 0,
+                               "stake": 0.0, "pnl": 0.0})
+        a["total"] += 1
         a["stake"] += r["stake"]
-        a["pl"]    += r["payout"] - r["stake"]
+        a["pnl"]   += r["payout"] - r["stake"]
         if r["status"] == "WON":
             a["won"] += 1
         else:
             a["lost"] += 1
-    return agg
 
+    out: list[tuple] = []
+    for idx, (tier, m) in enumerate(sorted(tmp.items())):
+        out.append((idx, tier, m["total"], m["won"],
+                    m["lost"], m["stake"], m["pnl"]))
+    return out
