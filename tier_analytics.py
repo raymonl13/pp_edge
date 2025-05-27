@@ -43,3 +43,29 @@ def _write(rows: list[tuple], out_dir: pathlib.Path) -> pathlib.Path:
             w.writerow([today,*r[1:]])
     return out
 
+
+# -----------------------------------------------------------------------
+# CLI entry-point
+# -----------------------------------------------------------------------
+import os, sys, datetime, csv, pathlib, typing as _t   # re-imports safe in Py ≥3.9
+
+def main() -> int:
+    """
+    Aggregate tier KPIs unless PP_EDGE_TEST_MODE is set.
+    Usage: python tier_analytics.py [slip_csv]
+    Returns 0 on success.
+    """
+    if os.getenv("PP_EDGE_TEST_MODE"):
+        return 0
+
+    slip_csv = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else pathlib.Path("data/slip_results.csv")
+    rows = _aggregate(_read_slips(slip_csv))
+
+    out_dir = pathlib.Path("analytics")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    _write(rows, out_dir)
+    return 0
+
+
+if __name__ == "__main__":              # pragma: no cover
+    sys.exit(main())
