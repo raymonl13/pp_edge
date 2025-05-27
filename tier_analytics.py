@@ -32,3 +32,14 @@ def _aggregate(rows: typing.Iterable[dict]) -> list[tuple]:
         out.append((idx, tier, m["total"], m["won"],
                     m["lost"], m["stake"], m["pnl"]))
     return out
+def _write(rows: list[tuple], out_dir: pathlib.Path) -> pathlib.Path:
+    import csv, datetime
+    today = datetime.date.today().isoformat()
+    out = out_dir / f"tier_kpi_{today}.csv"
+    with out.open("w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["date","tier","total","won","lost","stake","pnl"])
+        for r in rows:
+            w.writerow([today,*r[1:]])
+    return out
+
