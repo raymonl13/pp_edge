@@ -9,3 +9,7 @@ model_assets/
 *.yml
 barrel_pct.py
 tmp_cfg
+
+# coverage artefacts
+.coverage*
+coverage.xml
