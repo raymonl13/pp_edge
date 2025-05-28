@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "jest --watchAll=false --runInBand",
-    "cypress:run": "start-server-and-test dev http://localhost:5173/dashboard_v3 cypress run --browser chrome --headless"
+    "cypress:run": "start-server-and-test dev 5173 cy:headless",
+    "cy:headless": "cypress run --browser chrome --headless"
   },
   "dependencies": {
     "papaparse": "^5.5.3",
