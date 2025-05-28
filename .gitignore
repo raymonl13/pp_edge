@@ -13,3 +13,7 @@ tmp_cfg
 # coverage artefacts
 .coverage*
 coverage.xml
+
+# Cypress artefacts
+cypress/screenshots/
+cypress/videos/
