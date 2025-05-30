@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
-set -e
-npm run build:preview
-npx vite preview --port 5173 --strictPort &
-PREVIEW=\$!
-npx wait-on http://localhost:5173/
-npm run cy:headless
-kill \$PREVIEW
+set -euo pipefail
+pkill -f uvicorn || true
+pkill -f vite || true
+uvicorn dashboard_v3.server:app --port 8000 --reload &
+SERVER_PID=$!
+wait-on --timeout 20000 http-get://localhost:8000/api/edges
+npm run dev --prefix dashboard_v3 &
+VITE_PID=$!
+wait-on --timeout 20000 http-get://localhost:5173
+npm run cy:headless --prefix dashboard_v3
+kill $VITE_PID $SERVER_PID
