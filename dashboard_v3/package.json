@@ -13,6 +13,8 @@
     "build:preview": "vite build --base=/"
   },
   "dependencies": {
+    "axios": "^1.9.0",
+    "dotenv": "^16.5.0",
     "papaparse": "^5.5.3",
     "react": "18.2.0",
     "react-dom": "18.2.0"
