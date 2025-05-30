@@ -1,0 +1,34 @@
+import React, {useEffect, useState} from 'react';
+import {fetchCsv} from '../utils/csv.js';
+import SparkLine from './SparkLine.jsx';
+
+export default function EdgeTable() {
+  const [rows, setRows] = useState([]);
+
+  useEffect(() => {
+    fetchCsv('/edge_sheet_sample.csv').then(setRows);
+  }, []);
+
+  return (
+    <table className="min-w-full border">
+      <thead>
+        <tr>
+          <th className="p-2 border">Player</th>
+          <th className="p-2 border text-right">Edge %</th>
+          <th className="p-2 border">Spark</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr key={r.player}>
+            <td className="p-2 border">{r.player}</td>
+            <td className="p-2 border text-right">{r.edge}</td>
+            <td className="p-2 border">
+              <SparkLine values={JSON.parse(r.spark)} />
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
