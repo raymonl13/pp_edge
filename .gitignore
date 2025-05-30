@@ -22,3 +22,4 @@ cypress/videos/
 dashboard_v3/node_modules/
 dashboard_v3/dist/
 >>>>>>> Stashed changes
+!dashboard_v3/.env
