@@ -2,7 +2,15 @@
   "name": "pp-edge-dashboard-v3",
   "version": "0.1.0",
   "scripts": {
+<<<<<<< Updated upstream
     "dev": "vite",
+=======
+    "dev": "vite --port 5173 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "jest --watchAll=false --runInBand",
+    "cypress:run": "bash cypress-smoke.sh",
+>>>>>>> Stashed changes
     "cy:headless": "cypress run --browser electron --headless",
     "cypress:run": "bash cypress-smoke.sh"
   }
