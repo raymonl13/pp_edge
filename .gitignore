@@ -22,7 +22,3 @@ cypress/videos/
 # Dashboard build artefacts
 dashboard_v3/node_modules/
 dashboard_v3/dist/
-
-# Keep the per-app env file
-!dashboard_v3/.env
-
