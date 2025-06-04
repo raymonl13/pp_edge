@@ -57,7 +57,7 @@ def main(argv=None):
     auc_ref = base_auc(model, X, y)
     params = iso if iso["auc"] >= auc_ref - 0.03 else calibrate(model, df, "platt")
 
-    # ensure model_assets/ exists on first run in fresh clonen
+    # ensure model_assets/ exists on first run in fresh clone
     CAL_YAML.parent.mkdir(parents=True, exist_ok=True)
     with open(CAL_YAML, "w") as f:
         json.dump(params, f, indent=2)
