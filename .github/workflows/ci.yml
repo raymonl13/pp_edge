@@ -22,7 +22,7 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          pytest --cov=. --cov-report=xml
+          pytest --cov=pp_edge --cov=utils --cov-report=xml
 
       - name: Enforce ≥ 80 % line coverage
         run: |
