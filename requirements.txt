@@ -16,4 +16,4 @@ scikit-learn>=1.0,<2.0
 numpy<2.0
 streamlit>=1.33.0
 lightgbm==4.3.0
-pybaseball>=2.7
+pybaseball==2.2.7
