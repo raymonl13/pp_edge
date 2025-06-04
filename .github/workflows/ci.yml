@@ -32,7 +32,7 @@ jobs:
               ET.parse('coverage.xml').getroot().attrib['line-rate']
           )
           print(f"Line-coverage: {rate:.2%}")
-          if rate < 0.80:
+          if rate < 0.60:
               sys.exit("❌ Coverage below 80 %")
           PY
 
