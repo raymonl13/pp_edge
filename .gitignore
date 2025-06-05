@@ -4,6 +4,9 @@ __pycache__/
 # Project data and assets
 data/
 model_assets/
+!model_assets/.gitkeep
+!model_assets/*.yaml
+!model_assets/*.sha256
 *.csv
 *.json
 .env
