@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+
+const safeParse = s => { try { return safeParse(s ?? "[]"); } catch { return []; } };
 import { fetchCsv } from '../utils/csv.js';
 import SparkLine from './SparkLine.jsx';
 
@@ -21,7 +23,7 @@ export default function EdgeTable() {
       <tbody>
         {rows.map((r) => {
           const sparkVals =
-            Array.isArray(r.spark) ? r.spark : JSON.parse(r.spark);
+            Array.isArray(r.spark) ? r.spark : safeParse(r.spark);
           return (
             <tr key={r.player}>
               <td className="p-2 border">{r.player}</td>

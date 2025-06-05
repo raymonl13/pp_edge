@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --port ${DEV_PORT:-5174} --strictPort",
     "build": "vite build",
     "preview": "vite preview",
     "test": "jest --watchAll=false --runInBand",
