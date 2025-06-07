@@ -179,3 +179,27 @@ Secrets: SLACK_WEBHOOK, PP_EDGE_TEST_MODE (true on PRs)
 ### Live Submit Flow (Phase 6)
 `scripts/live_submit.py` test mode prints payload, live mode posts.
 Workflow: `.github/workflows/live_submit.yml`
+
+---
+
+## 7  CI & Coverage Hardening  (added for Milestone 11)
+
+### 7.1  Single on-push trigger rule
+* Only **`ci.yml`** may use `on: push`.  
+* All other workflows (e.g. **`nightly_retrain.yml`**, **`dryrun.yml`**) must be triggered by `schedule:` or `workflow_dispatch:` **only**.  
+* This prevents duplicate CI minutes and makes the status check list predictable.
+
+> **How to fix a duplicate trigger**  
+> Remove the entire `push:` block from the secondary workflow and commit.  
+> Example:
+> ```yaml
+> on:
+>   schedule:
+>     - cron:  '0 9 * * *'
+>   workflow_dispatch:
+> ```
+
+### 7.2  Coverage scope & threshold
+* Pytest runs with  
+  ```bash
+  pytest --cov=pp_edge --cov=utils --cov-report=xml
