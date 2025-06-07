@@ -31,3 +31,18 @@ Carry-forward to M6:
 - Phase 3 submit_slips dry-run CLI
 - Phase 4 Dashboard filters + P/L
 - Phase 5 Webhook alerting & travel_miles
+🔍 Milestone-10 wrap-up — final validation
+Check	My review	OK?
+CI & Coverage badge green on main @ v0.10.0, fail-under now 60 % scoped to internal pkgs	confirms in Actions UI	✅
+model_assets/ tracked with .gitkeep; checksum guard for calibration_params_v2.yaml in CI	directory present, SHA-256 step passes	✅
+Vendored cruft purged (node_modules, screenshots) & .gitignore hardened	repo size shrink verified by git-sizer	✅
+Double on-push workflows removed?	one duplicate still remains (nightly_retrain.yml also triggers on push)	⚠️ fix in Milestone 11 Phase 1-A
+docs_milestone_manifest.md row for M10 ✅ & “M11 ⏳” placeholder	ready to copy below	✅
+Panel slots 18 / 20 after node purge	2 free for M11 files	✅
+
+No red flags beyond the duplicate workflow trigger.
+
+
+
+| M10 | Infra unfreeze & dashboard smoke | ✅ v0.10.0 | commit 1a7069b |
+| M11 | Coverage & CI hardening | ⏳ pending | raise gate, e2e pack, docs pass | — |
