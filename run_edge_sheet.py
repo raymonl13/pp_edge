@@ -10,7 +10,7 @@ raw = pd.concat([
 ], ignore_index=True)
 df = normalize(raw)
 X, y = build_feature_df(df)
-probs = joblib.load("model_assets/model_v2.pkl").predict_proba(X)[:, 1]
+probs = joblib.load(MODEL_PATH).predict_proba(X)[:, 1]
 print("AUC   :", round(roc_auc_score(y, probs), 3))
 print("Brier :", round(brier_score_loss(y, probs), 3))
 
@@ -30,4 +30,3 @@ import hashlib, os
 if MODEL_PATH.exists():
     sha = hashlib.sha256(MODEL_PATH.read_bytes()).hexdigest()[:8]
     print(f"[nightly_edge_sheet] model sha={sha}")
-
