@@ -25,3 +25,9 @@ slips = run_pipeline(legs, cfg)
 pd.DataFrame(slips).to_csv(f"edge_sheet_{tom}.csv", index=False)
 print(f"→ {len(legs)} legs with edge ≥ {cfg.get('min_edge_pp',0.03)}")
 print(f"edge_sheet_{tom}.csv written – {len(slips)} slips generated")
+
+import hashlib, os
+if MODEL_PATH.exists():
+    sha = hashlib.sha256(MODEL_PATH.read_bytes()).hexdigest()[:8]
+    print(f"[nightly_edge_sheet] model sha={sha}")
+
