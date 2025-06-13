@@ -1,4 +1,9 @@
 import datetime, json, os, sys, yaml, joblib, pandas as pd
+from pathlib import Path
+MODEL_PATH = Path("model_assets/model_v2.pkl")
+if not MODEL_PATH.exists():
+    print(f"[nightly_edge_sheet] Missing {MODEL_PATH}. Skipping sheet.", flush=True)
+    sys.exit(0)
 from sklearn.metrics import roc_auc_score, brier_score_loss
 from data_utils.normalize_statcast import normalize
 from code_utils_model_v1 import build_feature_df
@@ -10,7 +15,7 @@ raw = pd.concat([
 ], ignore_index=True)
 df = normalize(raw)
 X, y = build_feature_df(df)
-probs = joblib.load("model_assets/model_v2.pkl").predict_proba(X)[:, 1]
+probs = joblib.load(MODEL_PATH).predict_proba(X)[:, 1]
 print("AUC   :", round(roc_auc_score(y, probs), 3))
 print("Brier :", round(brier_score_loss(y, probs), 3))
 
