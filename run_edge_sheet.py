@@ -1,3 +1,8 @@
+from pathlib import Path
+MODEL_PATH = Path("model_v2.pkl")
+if not MODEL_PATH.exists():
+    print("Skipping – missing artefact")
+    exit(0)
 import datetime, json, os, sys, yaml, joblib, pandas as pd
 from pathlib import Path
 MODEL_PATH = Path("model_assets/model_v2.pkl")

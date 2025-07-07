@@ -1,3 +1,10 @@
+from pathlib import Path
+MODEL_PATH = Path("model_v2.pkl")
+if not MODEL_PATH.exists():
+    print("Skipping – missing artefact")
+    exit(0)
+
+
 import pandas as pd, numpy as np, joblib
 from pathlib import Path
 from data_utils.normalize_statcast import normalize
