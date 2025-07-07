@@ -19,7 +19,13 @@ def _prep(df):
 
 def _train(X, y):
     X_tr, X_val, y_tr, y_val = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
-    model = lgb.LGBMClassifier(n_estimators=300, learning_rate=0.05, subsample=0.8, colsample_bytree=0.8, objective="binary")
+    model = lgb.LGBMClassifier(
+        n_estimators=300,
+        learning_rate=0.05,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        objective="binary",
+    )
     model.fit(X_tr, y_tr)
     auc = roc_auc_score(y_val, model.predict_proba(X_val)[:, 1])
     return model, auc
