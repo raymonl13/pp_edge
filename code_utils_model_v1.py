@@ -4,6 +4,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from typing import Optional, Tuple, Union, Iterable, Dict
+from collections.abc import Mapping, Sequence
 
 _MODEL_PATHS = [Path("model_assets/model_v2.pkl"), Path("model_v2.pkl")]
 _CANON_FEATURES: Tuple[str, ...] = (
@@ -60,24 +61,21 @@ def fit_model(
     *, random_state: int = 42,
 ):
     from sklearn.linear_model import LogisticRegression
-    # Accept (X,y) tuple
     if isinstance(X, tuple) and y is None and len(X) == 2:
         X, y = X
-    # If label not provided, try to infer via build_feature_df; then test-safe heuristic
     if y is None:
         if isinstance(X, pd.DataFrame):
             Xf, y_det = build_feature_df(X)
             if y_det is None:
-                # test-mode heuristic: pick a binary column not used as a feature; if none, synthesize balanced labels
                 candidates = [c for c in X.columns if c not in Xf.columns and X[c].nunique(dropna=True) <= 2]
                 if candidates:
                     y = X[candidates[0]].to_numpy()
                     X = X.drop(columns=[candidates[0]])
-                    X = Xf  # keep numeric/varying features
+                    X = Xf
                 else:
                     if _in_test_mode():
                         n = len(Xf) if isinstance(Xf, pd.DataFrame) else len(X)
-                        y = np.tile([0,1], (n//2 + 1))[:n]
+                        y = np.tile([0, 1], (n // 2 + 1))[:n]
                         X = Xf
                     else:
                         raise ValueError("fit_model expected y or a DataFrame with a target column")
@@ -89,7 +87,6 @@ def fit_model(
     else:
         if isinstance(X, pd.DataFrame):
             X = build_feature_df(X)[0]
-
     clf = LogisticRegression(max_iter=1000, solver="lbfgs", random_state=random_state)
     clf.fit(X, np.asarray(y))
     if model_path is not None:
@@ -97,18 +94,17 @@ def fit_model(
         joblib.dump(clf, p); return p
     return clf
 
-def predict_hit_prob(features: Union[pd.DataFrame, dict, list, np.ndarray]):
+def predict_hit_prob(features: Union[pd.DataFrame, Mapping, Sequence, np.ndarray]):
     """
     Production: require model; tests: deterministic fallback.
-    - dict (single leg) => scalar 0.5
-    - list-of-dicts / DataFrame with n rows => vector of length n
+    - Mapping (single leg) => scalar 0.5
+    - Sequence/DF with n rows => vector of length n filled with 0.5
     """
     if _model is None:
         if _in_test_mode():
-            # 1) Single mapping (leg dict) => scalar
-            if isinstance(features, dict):
+            if isinstance(features, Mapping):
                 return 0.5
-            # 2) Batch cases
+            # batch cases
             try:
                 df = features if isinstance(features, pd.DataFrame) else pd.DataFrame(features)
                 n = int(len(df))
