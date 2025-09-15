@@ -10,7 +10,7 @@ _MODEL_PATHS = [
     Path("model_v2.pkl"),
 ]
 
-# ---- Lazy-loaded model (never exit at import) ----
+# ---- Lazy-loaded model (no exit at import) ----
 _model = None
 for p in _MODEL_PATHS:
     if p.exists():
@@ -27,10 +27,9 @@ def predict_hit_prob(features: pd.DataFrame) -> np.ndarray:
     """
     if _model is None:
         raise RuntimeError("model_v2 not loaded; ensure nightly downloaded artefact or skip guarded call")
-    # Expect a predict_proba-compatible estimator
     return _model.predict_proba(features.fillna(0))[:, 1]
 
-# ---- Restored public API expected by tests ----
+# ---- Restored API expected by tests ----
 
 def build_feature_df(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -43,10 +42,9 @@ def build_feature_df(df: pd.DataFrame) -> pd.DataFrame:
         raise TypeError("build_feature_df expects a pandas.DataFrame")
     num = df.select_dtypes(include=["number"]).apply(pd.to_numeric, errors="coerce").fillna(0.0)
     if num.empty:
-        # preserve shape/contract: return empty DF rather than raising
         return num
     varying = [c for c in num.columns if num[c].nunique(dropna=False) > 1]
-    return num[varying] if varying else num.iloc[:, :0]  # empty frame if all constants
+    return num[varying] if varying else num.iloc[:, :0]
 
 def fit_model(
     X: Union[pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
@@ -58,28 +56,20 @@ def fit_model(
     Minimal classifier fit that satisfies tests:
     - accepts (X, y) OR a single DataFrame with a 'target' column
     - returns an estimator exposing predict_proba(X)[:,1]
-    Uses scikit-learn LogisticRegression for portability on 3.9.
     """
     from sklearn.linear_model import LogisticRegression
-
-    # Flexible input handling
     if isinstance(X, tuple) and y is None and len(X) == 2:
-        X, y = X  # type: ignore
+        X, y = X
     if y is None:
         if isinstance(X, pd.DataFrame) and "target" in X.columns:
             y = X["target"].to_numpy()
             X = X.drop(columns=["target"])
         else:
             raise ValueError("fit_model expected y or a DataFrame with a 'target' column")
-
     Xf = build_feature_df(X) if isinstance(X, pd.DataFrame) else X
     clf = LogisticRegression(max_iter=1000, solver="lbfgs", random_state=random_state)
     clf.fit(Xf, np.asarray(y))
     return clf
 
-__all__ = [
-    "predict_hit_prob",
-    "build_feature_df",
-    "fit_model",
-]
+__all__ = ["predict_hit_prob", "build_feature_df", "fit_model"]
 
