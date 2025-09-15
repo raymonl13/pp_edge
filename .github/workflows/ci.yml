@@ -7,7 +7,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     env:
-      PP_EDGE_TEST_MODE: '1'  # enable test-safe behavior in unit tests
+      PP_EDGE_TEST_MODE: '1'    # enable test-safe code paths during unit tests
 
     steps:
       - uses: actions/checkout@v4
@@ -21,6 +21,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest pytest-cov
+
+      - name: Debug env (test mode)
+        run: echo "PP_EDGE_TEST_MODE=$PP_EDGE_TEST_MODE"
 
       - name: Run tests with coverage
         run: |
