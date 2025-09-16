@@ -1,80 +1,96 @@
-# .github/workflows/ci.yml
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      PP_EDGE_TEST_MODE: '1'  # enable test-safe behavior during unit tests
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v5
         with:
           python-version: '3.9'
 
-      - name: Install dependencies
+      - name: Install deps (lean)
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-cov
+          pip install -q pytest pytest-cov pyyaml requests pandas
 
-      - name: Debug env (test mode)
-        run: echo "PP_EDGE_TEST_MODE=$PP_EDGE_TEST_MODE"
-
-      - name: Tripwire — import-time exit detector
+      - name: Import-exit detector (exec-based, must run before pytest)
+        env:
+            PP_EDGE_TEST_MODE: "1"
         run: |
-          set -euo pipefail
           python - <<'PY'
-          import importlib.util, sys
-          from pathlib import Path
-
-          ROOT = Path(".").resolve()
-          def should_scan(p: Path):
-              s = str(p)
-              return (
-                  s.endswith(".py")
-                  and "/tests/" not in s
-                  and "/.github/" not in s
-                  and "/.venv/" not in s
-                  and "/venv/" not in s
-                  and "/__pycache__/" not in s
-              )
-
-          offenders = []
-          for p in sorted(q for q in ROOT.rglob("*.py") if should_scan(q)):
+          import os, sys, importlib, pathlib, traceback
+          ROOT = pathlib.Path("."); failures = []
+          def is_source(p: pathlib.Path) -> bool:
+              parts = p.parts
+              if any(x in parts for x in (".venv","venv","env","tests","scripts","data")):
+                  return False
+              return p.suffix == ".py"
+          candidates = []
+          for p in ROOT.rglob("*.py"):
+              if not is_source(p): 
+                  continue
+              rel = p.relative_to(ROOT).with_suffix("")
+              mod = ".".join(rel.parts)
+              if p.name == "__main__.py":
+                  continue
+              candidates.append((mod, str(p)))
+          for mod, path in sorted(candidates):
               try:
-                  spec = importlib.util.spec_from_file_location(f"scan_{hash(p)}", p)
-                  mod = importlib.util.module_from_spec(spec)  # type: ignore
-                  spec.loader.exec_module(mod)  # type: ignore
-              except SystemExit as se:
-                  offenders.append((str(p), se.code))
+                  importlib.invalidate_caches()
+                  importlib.import_module(mod)
+              except SystemExit as e:
+                  failures.append((path, f"SystemExit at import: code={e.code}"))
               except Exception:
-                  # Ignore ordinary import errors — we’re only hunting import-time SystemExit.
-                  pass
-
-          if offenders:
-              print("Import-time exit() detected in:")
-              for path, code in offenders:
-                  print(f" - {path} (SystemExit: {code})")
+                  failures.append((path, "Exception at import:\n" + traceback.format_exc()))
+          if failures:
+              for path, msg in failures:
+                  print(f"[IMPORT-EXIT] {path}: {msg}", file=sys.stderr)
               sys.exit(1)
-          print("No import-time exit() detected.")
+          print("✓ Import-exit guard passed")
           PY
 
       - name: Run tests with coverage
+        env:
+          PP_EDGE_TEST_MODE: '1'
         run: |
-          pytest --cov=pp_edge --cov=utils --cov-report=xml
+          pytest -q --disable-warnings --maxfail=1 \
+            --cov=. \
+            --cov-config=.coveragerc \
+            --cov-report=xml:coverage.xml \
+            --cov-report=term-missing
 
-      - name: Enforce ≥ 60 % line coverage
+      - name: Coverage gate (fail under MIN_COVERAGE)
+        env:
+          MIN_COVERAGE: "60"
         run: |
           python - <<'PY'
-          import sys, xml.etree.ElementTree as ET
-          rate = float(ET.parse('coverage.xml').getroot().attrib['line-rate'])
-          print(f"Line-coverage: {rate:.2%}")
-          if rate < 0.60:
-              sys.exit("❌ Coverage below 60 %")
+          import os, sys, xml.etree.ElementTree as ET
+          thr = float(os.getenv("MIN_COVERAGE", "60"))
+          root = ET.parse("coverage.xml").getroot()
+          rate = root.attrib.get("line-rate")
+          if rate is None:
+              lv = int(root.attrib.get("lines-valid", "0"))
+              lc = int(root.attrib.get("lines-covered", "0"))
+              pct = 0.0 if lv == 0 else 100.0 * lc / lv
+          else:
+              pct = float(rate) * 100.0
+          print(f"Coverage total: {pct:.1f}% (threshold {thr:.0f}%)")
+          if pct + 1e-9 < thr:
+              sys.exit(1)
           PY
 
+      - name: Upload coverage.xml
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
