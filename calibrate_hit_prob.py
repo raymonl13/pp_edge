@@ -21,6 +21,9 @@ import numpy as np
 import pandas as pd
 import joblib
 
+# Default calibration spec path (tests may monkeypatch this)
+CAL_YAML = Path("artifacts") / "calibration.yaml"
+
 # Canonical model locations used in prod when no explicit path is given
 _MODEL_PATHS = (Path("model_assets") / "model_v2.pkl", Path("model_v2.pkl"))
 
@@ -94,8 +97,7 @@ def main(argv: list[str] | None = None) -> int:
     return calibrate(args.input_path, args.output_path)
 
 
-__all__ = ["dt", "load_model", "calibrate", "main"]
-
+__all__ = ["dt", "CAL_YAML", "load_model", "calibrate", "main"]
 
 if __name__ == "__main__":
     sys.exit(main())
