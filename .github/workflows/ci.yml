@@ -6,10 +6,11 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      PP_EDGE_TEST_MODE: '1'    # enable test-safe code paths during unit tests
 
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.9'
@@ -20,19 +21,20 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-cov
 
+      - name: Debug env (test mode)
+        run: echo "PP_EDGE_TEST_MODE=$PP_EDGE_TEST_MODE"
+
       - name: Run tests with coverage
         run: |
           pytest --cov=pp_edge --cov=utils --cov-report=xml
 
-      - name: Enforce ≥ 80 % line coverage
+      - name: Enforce ≥ 60 % line coverage
         run: |
           python - <<'PY'
           import sys, xml.etree.ElementTree as ET
-          rate = float(
-              ET.parse('coverage.xml').getroot().attrib['line-rate']
-          )
+          rate = float(ET.parse('coverage.xml').getroot().attrib['line-rate'])
           print(f"Line-coverage: {rate:.2%}")
           if rate < 0.60:
-              sys.exit("❌ Coverage below 80 %")
+              sys.exit("❌ Coverage below 60 %")
           PY
 
