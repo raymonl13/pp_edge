@@ -1,43 +1,44 @@
+# run_edge_sheet.py
+"""
+Import-safe runner for the edge sheet.
+
+- NEVER exits at import time.
+- When executed as a script, it:
+    * accepts --date YYYY-MM-DD (default today)
+    * skips cleanly (exit code 0) if the model artefact is missing
+    * otherwise defers to code_cli_run_edge_sheet_v1.py
+"""
+from __future__ import annotations
+
+import argparse
+import os
+import subprocess
+import sys
+from datetime import date
 from pathlib import Path
-MODEL_PATH = Path("model_v2.pkl")
-if not MODEL_PATH.exists():
-    print("Skipping – missing artefact")
-    exit(0)
-import datetime, json, os, sys, yaml, joblib, pandas as pd
-from pathlib import Path
+
 MODEL_PATH = Path("model_assets/model_v2.pkl")
-if not MODEL_PATH.exists():
-    print(f"[nightly_edge_sheet] Missing {MODEL_PATH}. Skipping sheet.", flush=True)
-    sys.exit(0)
-from sklearn.metrics import roc_auc_score, brier_score_loss
-from data_utils.normalize_statcast import normalize
-from code_utils_model_v1 import build_feature_df
-from code_core_pp_edge_core_v6_7_v6 import run_pipeline
 
-raw = pd.concat([
-    pd.read_csv("statcast_2024.csv"),
-    pd.read_csv("statcast_2025.csv")
-], ignore_index=True)
-df = normalize(raw)
-X, y = build_feature_df(df)
-probs = joblib.load(MODEL_PATH).predict_proba(X)[:, 1]
-print("AUC   :", round(roc_auc_score(y, probs), 3))
-print("Brier :", round(brier_score_loss(y, probs), 3))
 
-cfg = yaml.safe_load(open("config_pp_edge_v6.8.yaml"))
-tom = (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
-board = f"data/pricefix_{tom}.json"
-if not os.path.exists(board):
-    sys.exit(f"missing board {board}")
+def _in_test_mode() -> bool:
+    return os.getenv("PP_EDGE_TEST_MODE") == "1" or "PYTEST_CURRENT_TEST" in os.environ
 
-legs = pd.read_json(board, orient="records").to_dict(orient="records")
-slips = run_pipeline(legs, cfg)
-pd.DataFrame(slips).to_csv(f"edge_sheet_{tom}.csv", index=False)
-print(f"→ {len(legs)} legs with edge ≥ {cfg.get('min_edge_pp',0.03)}")
-print(f"edge_sheet_{tom}.csv written – {len(slips)} slips generated")
 
-import hashlib, os
-if MODEL_PATH.exists():
-    sha = hashlib.sha256(MODEL_PATH.read_bytes()).hexdigest()[:8]
-    print(f"[nightly_edge_sheet] model sha={sha}")
+def main(argv: list[str] | None = None) -> int:
+    p = argparse.ArgumentParser(prog="run_edge_sheet", add_help=True)
+    p.add_argument("--date", dest="run_date", default=str(date.today()))
+    args = p.parse_args(argv or [])
+
+    # Skip cleanly if model is missing (unit test invariant + nightly skip behaviour)
+    if not MODEL_PATH.exists():
+        print("[nightly_edge_sheet] Missing model; skipping.", flush=True)
+        return 0
+
+    # Defer to canonical CLI for generation (keeps behaviour single-sourced)
+    cmd = [sys.executable, "code_cli_run_edge_sheet_v1.py", "--date", args.run_date]
+    return int(subprocess.run(cmd).returncode)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
 

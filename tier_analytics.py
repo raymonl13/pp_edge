@@ -66,6 +66,6 @@ def main() -> int:
     _write(rows, out_dir)
     return 0
 
-
-if __name__ == "__main__":              # pragma: no cover
+if __name__ == "__main__":
+    import sys
     sys.exit(main())

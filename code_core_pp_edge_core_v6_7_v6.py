@@ -32,3 +32,7 @@ def _price(legs: Iterable[Dict[str, Any]], payout: float):
                "p_hit":   prob,
                "edge_pp": edge,
                "tier":    tier}
+if __name__ == "__main__":
+    import sys
+    sys.exit(main())
+

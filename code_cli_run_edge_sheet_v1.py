@@ -22,4 +22,5 @@ def main():
     print(f"edge sheet written → {out} rows:{len(slips)}")
 
 if __name__ == "__main__":
-    main()
+    import sys
+    sys.exit(main())
