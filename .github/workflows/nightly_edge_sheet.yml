@@ -1,19 +1,58 @@
+# .github/workflows/nightly_edge_sheet.yml
 name: nightly_edge_sheet
+
 on:
   schedule:
-    - cron: '0 8 * * *'
+    - cron: '0 8 * * *'   # 08:00 UTC daily
   workflow_dispatch:
+
 jobs:
   edge-sheet:
     runs-on: ubuntu-latest
+    env:
+      PP_EDGE_TEST_MODE: ""    # ensure test-mode shims never affect nightly
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.9'
-      - run: pip install -r requirements.txt
-      - run: python run_edge_sheet.py --date $(date -u +%F)
-      - uses: actions/upload-artifact@v4
+
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Download model artefacts from release
+        env:
+          MODEL_BASE: ${{ secrets.PPEDGE_MODEL_URL }}
+        run: |
+          set -euo pipefail
+          test -n "$MODEL_BASE"
+          mkdir -p model_assets
+          curl -fsSL "$MODEL_BASE/model_v2.pkl" -o model_assets/model_v2.pkl
+          curl -fsSL "$MODEL_BASE/model_v2.sha256" -o model_assets/model_v2.sha256
+
+      - name: Verify SHA256
+        run: |
+          set -euo pipefail
+          cd model_assets
+          sha256sum -c model_v2.sha256
+
+      - name: Run edge sheet via CLI
+        id: sheet
+        run: |
+          set -euo pipefail
+          OUT="edge_sheet_$(date -u +%F).csv"
+          python code_cli_run_edge_sheet_v1.py --date "$(date -u +%F)"
+          test -f "$OUT" || { echo "Edge sheet not found: $OUT"; ls -la; exit 1; }
+          echo "out=$OUT" >> "$GITHUB_OUTPUT"
+
+      - name: Upload edge sheet artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: edge_sheet_$(date -u +%F).csv
-          path: edge_sheet_$(date -u +%F).csv
+          name: ${{ steps.sheet.outputs.out }}
+          path: ${{ steps.sheet.outputs.out }}
+
