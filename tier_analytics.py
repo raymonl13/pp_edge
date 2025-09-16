@@ -68,4 +68,9 @@ def main() -> int:
 
 
 if __name__ == "__main__":              # pragma: no cover
+# ... keep your existing imports and def main() above ...
+
+if __name__ == "__main__":
+    import sys
     sys.exit(main())
+
