@@ -42,6 +42,45 @@ jobs:
             exit 1
           fi
 
+      - name: Tripwire — import-time exit detector
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import importlib.util, sys
+          from pathlib import Path
+
+          ROOT = Path(".").resolve()
+          def should_scan(p: Path):
+              s = str(p)
+              return (
+                  s.endswith(".py")
+                  and "/tests/" not in s
+                  and "/.github/" not in s
+                  and "/.venv/" not in s
+                  and "/venv/" not in s
+                  and "/__pycache__/" not in s
+              )
+
+          offenders = []
+          for p in sorted(q for q in ROOT.rglob("*.py") if should_scan(q)):
+              try:
+                  spec = importlib.util.spec_from_file_location(f"scan_{hash(p)}", p)
+                  mod = importlib.util.module_from_spec(spec)  # type: ignore
+                  spec.loader.exec_module(mod)  # type: ignore
+              except SystemExit as se:
+                  offenders.append((str(p), se.code))
+              except Exception:
+                  # Ignore ordinary import errors — we’re only hunting import-time SystemExit.
+                  pass
+
+          if offenders:
+              print("Import-time exit() detected in:")
+              for path, code in offenders:
+                  print(f" - {path} (SystemExit: {code})")
+              sys.exit(1)
+          print("No import-time exit() detected.")
+          PY
+
       - name: Run tests with coverage
         run: |
           pytest --cov=pp_edge --cov=utils --cov-report=xml
