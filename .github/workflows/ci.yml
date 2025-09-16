@@ -25,23 +25,6 @@ jobs:
       - name: Debug env (test mode)
         run: echo "PP_EDGE_TEST_MODE=$PP_EDGE_TEST_MODE"
 
-      - name: Check for exit() outside __main__
-        run: |
-          set -euo pipefail
-          # Find any sys.exit()/exit() that is NOT under an __main__ guard.
-          # Exclude tests, CI config, and virtualenv caches.
-          EXIT_HITS="$(grep -R -nE '(^|\s)(sys\.exit|exit)\s*\(' --include='*.py' . \
-            | grep -v '__main__' \
-            | grep -v '^tests/' \
-            | grep -v '/\.github/' \
-            | grep -v '/\.venv/' \
-            | grep -v '/venv/' \
-            | grep -v '/__pycache__/' || true)"
-          if [ -n "${EXIT_HITS}" ]; then
-            echo "::error title=Import-time exit() found::The following lines call exit() outside __main__ guard:%0A${EXIT_HITS}"
-            exit 1
-          fi
-
       - name: Tripwire — import-time exit detector
         run: |
           set -euo pipefail
