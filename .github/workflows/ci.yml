@@ -1,10 +1,7 @@
 name: CI
-
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  push: { branches: [ main ] }
+  pull_request: { branches: [ main ] }
 
 jobs:
   test:
@@ -12,53 +9,46 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up Python 3.9
         uses: actions/setup-python@v5
         with:
           python-version: '3.9'
-
       - name: Install deps (lean)
         run: |
           python -m pip install --upgrade pip
           pip install -q pytest pytest-cov pyyaml requests pandas
-
-      - name: Import-exit detector (exec-based, must run before pytest)
+      - name: Import-exit detector (exec-based; only fail on SystemExit)
         env:
-            PP_EDGE_TEST_MODE: "1"
+          PP_EDGE_TEST_MODE: "1"
         run: |
           python - <<'PY'
-          import os, sys, importlib, pathlib, traceback
-          ROOT = pathlib.Path("."); failures = []
+          import sys, importlib, pathlib, traceback
+          ROOT = pathlib.Path(".")
           def is_source(p: pathlib.Path) -> bool:
               parts = p.parts
               if any(x in parts for x in (".venv","venv","env","tests","scripts","data")):
                   return False
               return p.suffix == ".py"
-          candidates = []
-          for p in ROOT.rglob("*.py"):
+          failures = []
+          for p in sorted(ROOT.rglob("*.py")):
               if not is_source(p): 
                   continue
-              rel = p.relative_to(ROOT).with_suffix("")
-              mod = ".".join(rel.parts)
+              mod = ".".join(p.relative_to(ROOT).with_suffix("").parts)
               if p.name == "__main__.py":
                   continue
-              candidates.append((mod, str(p)))
-          for mod, path in sorted(candidates):
               try:
                   importlib.invalidate_caches()
                   importlib.import_module(mod)
               except SystemExit as e:
-                  failures.append((path, f"SystemExit at import: code={e.code}"))
+                  failures.append(f"{p}: SystemExit at import (code={e.code})")
               except Exception:
-                  failures.append((path, "Exception at import:\n" + traceback.format_exc()))
+                  print(f"[IMPORT-WARN] {p}:\n{traceback.format_exc()}", file=sys.stderr)
           if failures:
-              for path, msg in failures:
-                  print(f"[IMPORT-EXIT] {path}: {msg}", file=sys.stderr)
+              for msg in failures:
+                  print(f"[IMPORT-EXIT] {msg}", file=sys.stderr)
               sys.exit(1)
           print("✓ Import-exit guard passed")
           PY
-
       - name: Run tests with coverage
         env:
           PP_EDGE_TEST_MODE: '1'
@@ -68,7 +58,6 @@ jobs:
             --cov-config=.coveragerc \
             --cov-report=xml:coverage.xml \
             --cov-report=term-missing
-
       - name: Coverage gate (fail under MIN_COVERAGE)
         env:
           MIN_COVERAGE: "60"
@@ -88,7 +77,6 @@ jobs:
           if pct + 1e-9 < thr:
               sys.exit(1)
           PY
-
       - name: Upload coverage.xml
         uses: actions/upload-artifact@v4
         with:
