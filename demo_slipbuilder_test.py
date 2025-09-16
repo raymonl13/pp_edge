@@ -5,3 +5,7 @@ cfg  = yaml.safe_load((ROOT / "config_pp_edge_v6.8.yaml").read_text())
 legs = json.loads((ROOT / "demo_slipbuilder_input.json").read_text())["legs"]
 def test_demo_slipbuilder():
     assert core.run_pipeline(legs, cfg)
+if __name__ == "__main__":
+    import sys
+    sys.exit(main())  # or wrap the previous exit expression if there is no main()
+

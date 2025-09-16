@@ -2,13 +2,11 @@ from pathlib import Path
 MODEL_PATH = Path("model_v2.pkl")
 if not MODEL_PATH.exists():
     print("Skipping – missing artefact")
-    exit(0)
 import datetime, json, os, sys, yaml, joblib, pandas as pd
 from pathlib import Path
 MODEL_PATH = Path("model_assets/model_v2.pkl")
 if not MODEL_PATH.exists():
     print(f"[nightly_edge_sheet] Missing {MODEL_PATH}. Skipping sheet.", flush=True)
-    sys.exit(0)
 from sklearn.metrics import roc_auc_score, brier_score_loss
 from data_utils.normalize_statcast import normalize
 from code_utils_model_v1 import build_feature_df
@@ -40,4 +38,8 @@ import hashlib, os
 if MODEL_PATH.exists():
     sha = hashlib.sha256(MODEL_PATH.read_bytes()).hexdigest()[:8]
     print(f"[nightly_edge_sheet] model sha={sha}")
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(main())
 

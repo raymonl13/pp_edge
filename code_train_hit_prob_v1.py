@@ -18,3 +18,5 @@ def train(model_path: Path,
 
 if __name__ == "__main__":
     train(Path("model_assets/model_v1.pkl"))
+    import sys
+    sys.exit(main())
