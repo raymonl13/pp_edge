@@ -1,5 +1,7 @@
 import os, sys, importlib.util, importlib, inspect, pathlib
-import numpy as np, pandas as pd, pytest
+import numpy as np, pytest
+from ._fixtures import make_edges_df
+
 pytestmark = pytest.mark.unit
 
 def _load_mc():
@@ -22,8 +24,7 @@ def test_simulate_deterministic_seed():
     if sim is None or not callable(sim):
         pytest.skip("simulate() not available")
 
-    # Always provide payout to satisfy implementations that require it
-    edges = pd.DataFrame({"edge":[0.05, 0.00, -0.02], "payout":[2.0, 2.0, 2.0]})
+    edges = make_edges_df(n=3, edge_vals=(0.05, 0.00, -0.02), payout=2.0, win_prob=0.5)
 
     sig = inspect.signature(sim)
     kwargs = {}
@@ -35,9 +36,10 @@ def test_simulate_deterministic_seed():
         kwargs["bankroll"] = 100.0
     if "payout" in sig.parameters:
         kwargs["payout"] = 2.0
+    if "win_prob" in sig.parameters:
+        kwargs["win_prob"] = 0.5
 
-    r1 = sim(**kwargs)
-    r2 = sim(**kwargs)
+    r1 = sim(**kwargs); r2 = sim(**kwargs)
     a1, a2 = np.asarray(r1, dtype=float), np.asarray(r2, dtype=float)
     assert len(a1) == 100 == len(a2)
     assert np.allclose(a1, a2)
