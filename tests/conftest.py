@@ -14,7 +14,6 @@ def _block_network_session():
         socket.create_connection = original_create
 
 def pytest_collection_modifyitems(config, items):
-    # In CI hygiene mode, skip heavy/integration demos
     if os.getenv("PP_EDGE_TEST_MODE") != "1":
         return
     skip = pytest.mark.skip(reason="skipped in CI test mode (PP_EDGE_TEST_MODE=1)")
