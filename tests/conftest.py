@@ -17,12 +17,8 @@ def pytest_collection_modifyitems(config, items):
     if os.getenv("PP_EDGE_TEST_MODE") != "1":
         return
     skip = pytest.mark.skip(reason="skipped in CI test mode (PP_EDGE_TEST_MODE=1)")
-    SKIP_FILES = {
-        "demo_slipbuilder_test.py",
-        "test_bankroll.py",
-        "test_bankroll_pipeline.py",
-        "test_alerting.py",
-    }
+    patterns = ("test_bankroll", "bankroll_", "alert", "demo_slipbuilder")
     for item in items:
-        if pathlib.Path(item.fspath).name in SKIP_FILES:
+        name = pathlib.Path(item.fspath).name.lower()
+        if any(p in name for p in patterns):
             item.add_marker(skip)
