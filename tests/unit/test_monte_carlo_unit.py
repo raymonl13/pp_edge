@@ -1,6 +1,9 @@
 import os, sys, importlib.util, importlib, inspect, pathlib
 import numpy as np, pytest
-from ._fixtures import make_edges_df
+try:
+    from tests.unit._fixtures import make_edges_df
+except Exception:
+    from ._fixtures import make_edges_df
 
 pytestmark = pytest.mark.unit
 
