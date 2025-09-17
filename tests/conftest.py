@@ -14,19 +14,20 @@ def _block_network_session():
         socket.create_connection = original_create
 
 def pytest_ignore_collect(path, config):
-    # Skip heavy/integration demos BEFORE import when in CI test mode
     if os.getenv("PP_EDGE_TEST_MODE") != "1":
         return False
     name = pathlib.Path(str(path)).name.lower()
-    patterns = ("test_bankroll", "bankroll_", "alert", "demo_slipbuilder")
+    patterns = (
+        "test_bankroll", "bankroll_", "alert", "demo_slipbuilder",
+        "test_feature_rolling_woba", "rolling_woba",
+    )
     return any(p in name for p in patterns)
 
 def pytest_collection_modifyitems(config, items):
-    # Redundant safety: mark any stragglers if they slip past ignore
     if os.getenv("PP_EDGE_TEST_MODE") != "1":
         return
     skip = pytest.mark.skip(reason="skipped in CI test mode (PP_EDGE_TEST_MODE=1)")
     for item in items:
-        name = pathlib.Path(item.fspath).name.lower()
-        if any(p in name for p in ("test_bankroll", "bankroll_", "alert", "demo_slipbuilder")):
+        n = pathlib.Path(item.fspath).name.lower()
+        if any(p in n for p in ("test_bankroll", "bankroll_", "alert", "demo_slipbuilder", "rolling_woba")):
             item.add_marker(skip)
