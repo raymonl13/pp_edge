@@ -1,5 +1,6 @@
-import os, socket, pytest, pathlib
+import os, socket, pytest, pathlib, sys
 
+print("CONFTEXT: loaded; PP_EDGE_TEST_MODE=", os.getenv("PP_EDGE_TEST_MODE"), file=sys.stderr)
 
 @pytest.fixture(autouse=True, scope="session")
 def _block_network_session():
@@ -14,22 +15,25 @@ def _block_network_session():
     finally:
         socket.create_connection = original
 
+HEAVY_PATTERNS = (
+    "test_bankroll", "bankroll_", "alert", "demo_slipbuilder",
+    "test_feature_rolling_woba", "rolling_woba", "tiers",
+)
 
-def _looks_heavy_test(path: pathlib.Path) -> bool:
-    name = path.name.lower()
-    return any(p in name for p in (
-        "test_bankroll", "bankroll_", "alert", "demo_slipbuilder",
-        "test_feature_rolling_woba", "rolling_woba",
-    ))
+def pytest_ignore_collect(path, config):
+    if os.getenv("PP_EDGE_TEST_MODE") != "1":
+        return False
+    name = pathlib.Path(str(path)).name.lower()
+    return any(p in name for p in HEAVY_PATTERNS)
 
 def pytest_collection_modifyitems(config, items):
     if os.getenv("PP_EDGE_TEST_MODE") != "1":
         return
-    skip_non_unit = pytest.mark.skip(reason="skipped: PR CI runs unit-tier only (PP_EDGE_TEST_MODE=1)")
+    skip = pytest.mark.skip(reason="PR CI runs unit-tier only (PP_EDGE_TEST_MODE=1)")
     for item in items:
-        # Prefer explicit markers
+        name = pathlib.Path(item.fspath).name.lower()
         marks = {m.name for m in item.iter_markers()}
         is_unit = "unit" in marks and not ({"integration","e2e"} & marks)
-        looks_heavy = _looks_heavy_test(pathlib.Path(item.fspath))
+        looks_heavy = any(p in name for p in HEAVY_PATTERNS)
         if not is_unit or looks_heavy:
-            item.add_marker(skip_non_unit)
+            item.add_marker(skip)
