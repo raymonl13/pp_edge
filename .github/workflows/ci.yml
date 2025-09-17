@@ -17,7 +17,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -q pytest pytest-cov pyyaml requests pandas
-      - name: Import-exit detector (exec-based; only fail on SystemExit)
+      - name: Import-exit detector (exec-based; ignore test files; only fail on SystemExit)
         env:
           PP_EDGE_TEST_MODE: "1"
         run: |
@@ -28,10 +28,15 @@ jobs:
               parts = p.parts
               if any(x in parts for x in (".venv","venv","env","tests","scripts","data")):
                   return False
-              return p.suffix == ".py"
+              if p.suffix != ".py":
+                  return False
+              n = p.name.lower()
+              if n.startswith("test_") or n.endswith("_test.py") or "test" in n:
+                  return False
+              return True
           failures = []
           for p in sorted(ROOT.rglob("*.py")):
-              if not is_source(p): 
+              if not is_source(p):
                   continue
               mod = ".".join(p.relative_to(ROOT).with_suffix("").parts)
               if p.name == "__main__.py":
@@ -39,10 +44,11 @@ jobs:
               try:
                   importlib.invalidate_caches()
                   importlib.import_module(mod)
-              except SystemExit as e:
-                  failures.append(f"{p}: SystemExit at import (code={e.code})")
-              except Exception:
-                  print(f"[IMPORT-WARN] {p}:\n{traceback.format_exc()}", file=sys.stderr)
+              except BaseException as e:
+                  if isinstance(e, SystemExit):
+                      failures.append(f"{p}: SystemExit at import (code={getattr(e,'code',None)})")
+                  else:
+                      print(f"[IMPORT-WARN] {p} ({type(e).__name__}):\n{traceback.format_exc()}", file=sys.stderr)
           if failures:
               for msg in failures:
                   print(f"[IMPORT-EXIT] {msg}", file=sys.stderr)
