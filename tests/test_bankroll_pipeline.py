@@ -1,3 +1,7 @@
+import os, pytest
+if os.getenv("PP_EDGE_TEST_MODE")== "1":
+    pytest.skip("skip bankroll pipeline in CI test mode", allow_module_level=True)
+
 import importlib, json, yaml, pathlib
 
 core = importlib.import_module("code_core_pp_edge_core_v6_7_v6")
