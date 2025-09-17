@@ -28,3 +28,5 @@ dashboard_v3/dist/
 !model_assets/*.yaml
 !model_assets/.gitkeep
 .DS_Store
+
+!.coveragerc

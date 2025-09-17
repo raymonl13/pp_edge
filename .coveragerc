@@ -1,0 +1,18 @@
+[run]
+source =
+    .
+omit =
+    */.venv/*
+    */venv/*
+    */site-packages/*
+    tests/*
+    scripts/*
+    */__pycache__/*
+
+[report]
+exclude_lines =
+    if __name__ == "__main__":
+    pragma: no cover
+
+precision = 0
+show_missing = True
