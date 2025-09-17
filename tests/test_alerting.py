@@ -1,3 +1,7 @@
+import os, pytest
+if os.getenv("PP_EDGE_TEST_MODE")== "1":
+    pytest.skip("skip alerting in CI test mode", allow_module_level=True)
+
 import threading, socketserver, http.server, pytest
 from alerting.notify_webhook_v1 import _post
 class H(http.server.BaseHTTPRequestHandler):
