@@ -59,7 +59,7 @@ jobs:
         env:
           PP_EDGE_TEST_MODE: '1'
         run: |
-          echo "PP_EDGE_TEST_MODE=$PP_EDGE_TEST_MODE" && pytest --version && pytest --collect-only -q -m unit | sed -n '1,200p' && pytest -q --disable-warnings --maxfail=1 -m unit \
+          echo "PP_EDGE_TEST_MODE=$PP_EDGE_TEST_MODE" && pytest --version && pytest --collect-only -q -o testpaths=tests/unit | sed -n '1,200p' && pytest -q --disable-warnings --maxfail=1 -o testpaths=tests/unit \
             --cov=. \
             --cov-config=.coveragerc \
             --cov-report=xml:coverage.xml \
