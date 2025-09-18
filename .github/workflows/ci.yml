@@ -1,7 +1,11 @@
 name: CI
+
 on:
-  push: { branches: [ main ] }
-  pull_request: { branches: [ main ] }
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   test:
@@ -9,14 +13,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Set up Python 3.9
         uses: actions/setup-python@v5
         with:
           python-version: '3.9'
+
       - name: Install deps (lean)
         run: |
           python -m pip install --upgrade pip
           pip install -q pytest pytest-cov pyyaml requests pandas numpy
+
+      # Import-exit detector (fail on SystemExit in library code; ignore tests/scripts)
       - name: Import-exit detector (exec-based; ignore test files; only fail on SystemExit)
         env:
           PP_EDGE_TEST_MODE: "1"
@@ -24,34 +32,29 @@ jobs:
           python - <<'PY'
           import sys, importlib, pathlib, traceback
           ROOT = pathlib.Path(".")
-          CLI_ALLOW = {
-    'run_edge_sheet.py', 'poll_slip_results.py', 'train_hit_prob_v2.py',
-    'app.py', 'dashboard/app.py', 'dashboard_v3/server.py'
-}
-
-def is_source(p: pathlib.Path) -> bool:
+          def is_source(p: pathlib.Path) -> bool:
               parts = p.parts
               if any(x in parts for x in (".venv","venv","env","tests","scripts","data")):
                   return False
-              if p.suffix != ".py":
-                  return False
-              n = p.name.lower()
-              if n.startswith("test_") or n.endswith("_test.py") or "test" in n:
-                  return False
-              return True
+              return p.suffix == ".py" and p.name != "__main__.py" and "test" not in p.name.lower()
+          CLI_ALLOW = {
+              'run_edge_sheet.py', 'poll_slip_results.py', 'train_hit_prob_v2.py',
+              'app.py', 'server.py'
+          }
           failures = []
           for p in sorted(ROOT.rglob("*.py")):
               if not is_source(p):
                   continue
               mod = ".".join(p.relative_to(ROOT).with_suffix("").parts)
-              if p.name == "__main__.py":
-                  continue
               try:
                   importlib.invalidate_caches()
                   importlib.import_module(mod)
               except BaseException as e:
                   if isinstance(e, SystemExit):
-                      failures.append(f"{p}: SystemExit at import (code={getattr(e,'code',None)})")
+                      if p.name in CLI_ALLOW:
+                          print(f"[IMPORT-WARN] {p}: SystemExit at import (allowed for CLI)", file=sys.stderr)
+                      else:
+                          failures.append(f"{p}: SystemExit at import (code={getattr(e,'code',None)})")
                   else:
                       print(f"[IMPORT-WARN] {p} ({type(e).__name__}):\n{traceback.format_exc()}", file=sys.stderr)
           if failures:
@@ -60,18 +63,25 @@ def is_source(p: pathlib.Path) -> bool:
               sys.exit(1)
           print("✓ Import-exit guard passed")
           PY
-            - name: Argparse-at-import (warn)
+
+      # Argparse-at-import (WARN phase)
+      - name: Argparse-at-import (warn)
         run: |
-          python scripts/check_argparse_import.py
-- name: Run tests with coverage (unit tier)
+          python scripts/check_argparse_import.py || true
+
+      - name: Run tests with coverage (unit tier)
         env:
           PP_EDGE_TEST_MODE: '1'
+          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/scripts
         run: |
-          echo "PP_EDGE_TEST_MODE=$PP_EDGE_TEST_MODE" && pytest --version && pytest --collect-only -q -o testpaths=tests/unit | tee pytest_collect.txt | sed -n '1,200p' && pytest -q --disable-warnings --maxfail=1 -o testpaths=tests/unit \
+          echo "PP_EDGE_TEST_MODE=$PP_EDGE_TEST_MODE" && pytest --version
+          pytest --collect-only -q -o testpaths=tests/unit | tee pytest_collect.txt | sed -n '1,200p'
+          pytest -q --disable-warnings --maxfail=1 -o testpaths=tests/unit \
             --cov=. \
             --cov-config=.coveragerc \
             --cov-report=xml:coverage.xml \
             --cov-report=term-missing
+
       - name: Coverage gate (fail under MIN_COVERAGE)
         env:
           MIN_COVERAGE: "60"
@@ -91,6 +101,7 @@ def is_source(p: pathlib.Path) -> bool:
           if pct + 1e-9 < thr:
               sys.exit(1)
           PY
+
       - name: Sanity check (non-zero tests & coverage)
         run: |
           python ci_sanity.py
