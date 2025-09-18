@@ -24,7 +24,12 @@ jobs:
           python - <<'PY'
           import sys, importlib, pathlib, traceback
           ROOT = pathlib.Path(".")
-          def is_source(p: pathlib.Path) -> bool:
+          CLI_ALLOW = {
+    'run_edge_sheet.py', 'poll_slip_results.py', 'train_hit_prob_v2.py',
+    'app.py', 'dashboard/app.py', 'dashboard_v3/server.py'
+}
+
+def is_source(p: pathlib.Path) -> bool:
               parts = p.parts
               if any(x in parts for x in (".venv","venv","env","tests","scripts","data")):
                   return False
