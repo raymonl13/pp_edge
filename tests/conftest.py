@@ -47,3 +47,24 @@ def pytest_collection_modifyitems(config, items):
         marks = {m.name for m in item.iter_markers()}
         if "unit" not in marks or {"integration","e2e"} & marks:
             item.add_marker(skip)
+
+# --- Extended shims for heavy sklearn submodules in unit lane ---
+import sys, types, os
+if os.getenv("PP_EDGE_TEST_MODE") == "1":
+    # ensure sklearn is a ModuleType with submodules
+    if "sklearn" not in sys.modules or not hasattr(sys.modules.get("sklearn"), "__spec__"):
+        import types as _t
+        sys.modules["sklearn"] = _t.ModuleType("sklearn")
+    # model_selection shim (e.g., train_test_split / KFold)
+    if "sklearn.model_selection" not in sys.modules:
+        ms = types.SimpleNamespace(
+            train_test_split=lambda *a, **k: (a[0], a[0], a[0], a[0]),
+            KFold=object
+        )
+        sys.modules["sklearn.model_selection"] = ms
+        setattr(sys.modules["sklearn"], "model_selection", ms)
+    # metrics shim (e.g., roc_auc_score)
+    if "sklearn.metrics" not in sys.modules:
+        met = types.SimpleNamespace(roc_auc_score=lambda *a, **k: 0.5)
+        sys.modules["sklearn.metrics"] = met
+        setattr(sys.modules["sklearn"], "metrics", met)
