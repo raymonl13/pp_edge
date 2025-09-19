@@ -25,18 +25,21 @@ def _find_build_fn(mod):
             if len(req) == 1: return obj
     return None
 
-def _force_stub_rolling_woba():
+def _force_stub_rolling_woba(mod):
     """
     Always replace rolling_woba with a zero-aligned Series stub to keep unit lane hermetic.
-    This still executes build_feature_df/_feature_matrix without requiring full pipeline columns.
+    Patch both the source module and any name bound inside code_utils_model_v1.
     """
-    try:
-        rw = importlib.import_module("features.rolling_woba")
-    except Exception:
-        return  # module absent; nothing to stub
     def zero_rw(df):
         return pd.Series(np.zeros(len(df), dtype=float), index=df.index, name="rolling_woba")
-    rw.rolling_woba = zero_rw
+    # Patch the module function
+    try:
+        rw_mod = importlib.import_module("features.rolling_woba")
+        rw_mod.rolling_woba = zero_rw
+    except Exception:
+        pass
+    # Patch the name bound in code_utils_model_v1 (handles "from ... import rolling_woba")
+    setattr(mod, "rolling_woba", zero_rw)
 
 def test_build_feature_df_happy_path():
     mod = _import_mod()
@@ -44,14 +47,14 @@ def test_build_feature_df_happy_path():
     if not callable(build):
         pytest.skip("no feature builder seam available")
 
-    # Minimal deterministic frame; keep only generic columns (no pipeline schema dependence)
+    # Minimal deterministic frame; keep generic columns only
     df = pd.DataFrame({
         "a":[1,2,3],
         "b":[0,0,0],
         "label":[0,1,0],
     })
 
-    _force_stub_rolling_woba()
+    _force_stub_rolling_woba(mod)
 
     out = build(df)
     if isinstance(out, tuple) and len(out) == 2:
