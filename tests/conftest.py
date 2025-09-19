@@ -135,3 +135,79 @@ if os.getenv("PP_EDGE_TEST_MODE") == "1":
             setattr(mu, func_name, _zero_series)
     except Exception:
         pass
+
+
+# === Unit-lane feature stubs (hermetic) ======================================
+# Lightweight shims for heavy libs and feature functions
+import os, sys, types
+import pandas as pd
+
+def _zero_series(df):
+    return pd.Series(0.0, index=df.index, name="stub")
+
+def _maybe_install(module_name, obj_name, value):
+    mod = sys.modules.get(module_name)
+    if not mod:
+        mod = types.ModuleModule(module_name) if hasattr(types, "ModuleModule") else types.ModuleType(module_name)
+        sys.modules[module_name] = mod
+    setattr(mod, obj_name, value)
+
+def pytest_configure(config):
+    # Only in PR unit lane
+    if os.getenv("PP_EDGE_TEST_MODE") != "1":
+        return
+
+    # 1) heavy libs shims (already added earlier, keep idempotent)
+    if "joblib" not in sys.modules:
+        job = types.ModuleType("joblib")
+        def _noop_dump(*a, **k): return None
+        def _noop_load(*a, **k): return None
+        job.dump = _noop_dump; job.load = _noop_load
+        sys.modules["joblib"] = job
+
+    # sklearn minimal surface (metrics & model_selection search CV)
+    if "sklearn" not in sys.modules:
+        skl = types.ModuleType("sklearn"); sys.modules["sklearn"] = skl
+    if "sklearn.metrics" not in sys.modules:
+        met = types.ModuleType("sklearn.metrics")
+        met.roc_auc_score = lambda *a, **k: 0.5
+        sys.modules["sklearn.metrics"] = met
+        setattr(sys.modules["sklearn"], "metrics", met)
+    if "sklearn.model_selection" not in sys.modules:
+        ms = types.ModuleType("sklearn.model_selection")
+        class _CV: 
+            def __init__(self,*a,**k): pass
+            def fit(self,*a,**k): return self
+            def best_estimator_(self): return None
+        ms.RandomizedSearchCV = _CV
+        ms.GridSearchCV = _CV
+        ms.KFold = object
+        sys.modules["sklearn.model_selection"] = ms
+        setattr(sys.modules["sklearn"], "model_selection", ms)
+
+    # 2) Feature function stubs (features.* & bound names in code_utils_model_v1)
+    import importlib
+    FEATURES = {
+        "features.rolling_woba": "rolling_woba",
+        "features.wind_adj": "wind_adj",
+        "features.platoon_split": "platoon_split",
+    }
+    for mod_name, fn_name in FEATURES.items():
+        try:
+            mod = importlib.import_module(mod_name)
+        except Exception:
+            # create placeholder module if missing
+            mod = types.ModuleType(mod_name)
+            sys.modules[mod_name] = mod
+        setattr(mod, fn_name, _zero_series)
+
+    # Patch bound names inside code_utils_model_v1 (handles "from … import …")
+    try:
+        mu = importlib.import_module("code_utils_model_v1")
+        for fn in ("rolling_woba","wind_adj","platoon_split"):
+            setattr(mu, fn, _zero_series)
+    except Exception:
+        pass
+
+# Prefer unit-only collection in CI already configured elsewhere
+
