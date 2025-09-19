@@ -76,7 +76,7 @@ jobs:
         run: |
           echo "PP_EDGE_TEST_MODE=$PP_EDGE_TEST_MODE" && pytest --version
           pytest --collect-only -q -o testpaths=tests/unit | tee pytest_collect.txt | sed -n '1,200p'
-          pytest -q --disable-warnings --maxfail=1 -o testpaths=tests/unit \
+          pytest -q --disable-warnings --maxfail=1 -ra -o testpaths=tests/unit \
             --cov=. \
             --cov-config=.coveragerc \
             --cov-report=xml:coverage.xml \
