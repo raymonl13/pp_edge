@@ -8,13 +8,11 @@ def test_build_feature_df_happy_path_joblib_shim():
         mod = importlib.import_module("code_utils_model_v1")
     except Exception as e:
         pytest.skip(f"model utils not importable: {e}")
-
     build = getattr(mod, "build_feature_df", None)
     if not callable(build):
         pytest.skip("build_feature_df not available")
-
     df = pd.DataFrame({"a":[1,2,3], "b":[0,0,0], "label":[0,1,0]})
-    X_y = build(df)               # some variants return (X, y), some return (X, None)
+    X_y = build(df)
     if isinstance(X_y, tuple) and len(X_y) == 2:
         X, y = X_y
         assert hasattr(X, "shape") and X.shape[0] == len(df)
