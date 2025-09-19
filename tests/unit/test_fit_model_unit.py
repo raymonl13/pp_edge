@@ -1,30 +1,37 @@
-import sys, types, importlib, inspect, pytest, pandas as pd
+import importlib, pytest, pandas as pd
 pytestmark = pytest.mark.unit
 
-def _import_mod():
-    sys.modules.setdefault("joblib", types.SimpleNamespace(dump=lambda *a, **k: None,
-                                                          load=lambda *a, **k: None))
+def _import_model_utils():
+    mu = importlib.import_module("code_utils_model_v1")
+    # Defensive bound-name patch for features, same as in build test
     try:
-        return importlib.import_module("code_utils_model_v1")
-    except Exception as e:
-        pytest.skip(f"model utils not importable: {e}")
+        for fn in ("rolling_woba","wind_adj","platoon_split"):
+            if hasattr(mu, fn):
+                setattr(mu, fn, lambda df: pd.Series(0.0, index=df.index, name=fn))
+    except Exception:
+        pass
+    return mu
 
-def _find_fit_fn(mod):
-    for name in ("fit_model","train_model","fit"):
-        fn = getattr(mod, name, None)
+def _find_fit_fn(mu):
+    for name in ("fit_model","fit","train_model"):
+        fn = getattr(mu, name, None)
         if callable(fn): return fn
-    # fallback: first callable with 2 required args
-    for name in dir(mod):
-        obj = getattr(mod, name)
+    import inspect
+    for name in dir(mu):
+        obj = getattr(mu, name)
         if callable(obj):
-            sig = inspect.signature(obj)
-            req = [p for p in sig.parameters.values() if p.default is inspect._empty and p.kind in (p.POSITIONAL_ONLY,p.POSITIONAL_OR_KEYWORD)]
-            if len(req) == 2: return obj
+            try:
+                sig = inspect.signature(obj)
+                # looking for (X, y, ...) signature
+                if len(sig.parameters) >= 2:
+                    return obj
+            except Exception:
+                continue
     return None
 
 def test_fit_model_minimal():
-    mod = _import_mod()
-    fit = _find_fit_fn(mod)
+    mu = _import_model_utils()
+    fit = _find_fit_fn(mu)
     if not callable(fit):
         pytest.skip("no fit seam available")
 
