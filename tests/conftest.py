@@ -103,3 +103,35 @@ if os.getenv("PP_EDGE_TEST_MODE") == "1":
         met.roc_auc_score = lambda *a, **k: 0.5
         sys.modules["sklearn.metrics"] = met
         setattr(sys.modules["sklearn"], "metrics", met)
+
+
+# --- Unified feature stubs for unit lane (PP_EDGE_TEST_MODE=1) ---
+# Goal: keep unit tests hermetic; any features.* used by code_utils_model_v1 returns aligned zeros.
+import os, sys, types, importlib
+if os.getenv("PP_EDGE_TEST_MODE") == "1":
+    def _zero_series(df):
+        import pandas as _pd, numpy as _np
+        return _pd.Series(_np.zeros(len(df), dtype=float), index=df.index, name="stubbed_feature")
+
+    # List of feature module:function pairs we know about (expandable)
+    _FEATURE_FUNCS = [
+        ("features.rolling_woba", "rolling_woba"),
+        ("features.wind_adj", "wind_adj"),
+        # add future feature funcs here without touching tests
+    ]
+
+    # Patch source modules if present
+    for mod_name, func_name in _FEATURE_FUNCS:
+        try:
+            m = importlib.import_module(mod_name)
+            setattr(m, func_name, _zero_series)
+        except Exception:
+            pass
+
+    # Patch bound names inside code_utils_model_v1 (handles "from … import func")
+    try:
+        mu = importlib.import_module("code_utils_model_v1")
+        for _, func_name in _FEATURE_FUNCS:
+            setattr(mu, func_name, _zero_series)
+    except Exception:
+        pass
