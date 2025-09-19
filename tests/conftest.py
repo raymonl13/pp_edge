@@ -68,3 +68,38 @@ if os.getenv("PP_EDGE_TEST_MODE") == "1":
         met = types.SimpleNamespace(roc_auc_score=lambda *a, **k: 0.5)
         sys.modules["sklearn.metrics"] = met
         setattr(sys.modules["sklearn"], "metrics", met)
+
+
+# --- Extended shims for sklearn search CV in unit lane ---
+import sys, types, os
+if os.getenv("PP_EDGE_TEST_MODE") == "1":
+    # ensure sklearn root exists
+    if "sklearn" not in sys.modules:
+        sys.modules["sklearn"] = types.ModuleType("sklearn")
+    # ensure model_selection module exists
+    if "sklearn.model_selection" not in sys.modules:
+        ms = types.ModuleType("sklearn.model_selection")
+        sys.modules["sklearn.model_selection"] = ms
+        setattr(sys.modules["sklearn"], "model_selection", ms)
+    ms = sys.modules["sklearn.model_selection"]
+    # light stubs that won't run searches but keep imports happy
+    class _DummySearch:
+        def __init__(self, *a, **k): pass
+        def fit(self, *a, **k): return self
+        def predict(self, *a, **k): return [0]*len(a[0]) if a else []
+    if not hasattr(ms, "RandomizedSearchCV"):
+        ms.RandomizedSearchCV = _DummySearch
+    if not hasattr(ms, "GridSearchCV"):
+        ms.GridSearchCV = _DummySearch
+    # keep handy split helpers too
+    if not hasattr(ms, "train_test_split"):
+        ms.train_test_split = lambda X, y=None, *a, **k: (X, X, y, y) if y is not None else (X, X, X, X)
+    if not hasattr(ms, "KFold"):
+        ms.KFold = object
+
+    # ensure metrics exists (roc_auc_score etc.)
+    if "sklearn.metrics" not in sys.modules:
+        met = types.ModuleType("sklearn.metrics")
+        met.roc_auc_score = lambda *a, **k: 0.5
+        sys.modules["sklearn.metrics"] = met
+        setattr(sys.modules["sklearn"], "metrics", met)
