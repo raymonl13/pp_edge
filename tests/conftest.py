@@ -3,6 +3,16 @@ import os, socket, pytest, pathlib, sys
 print("CONFTEXT: loaded; PP_EDGE_TEST_MODE=", os.getenv("PP_EDGE_TEST_MODE"), file=sys.stderr)
 
 # Block network unless explicitly allowed
+
+
+import sys, types, os
+if os.getenv("PP_EDGE_TEST_MODE") == "1":
+    sys.modules.setdefault("joblib", types.SimpleNamespace(dump=lambda *a, **k: None,
+                                                           load=lambda *a, **k: None))
+    sys.modules.setdefault("xgboost", types.SimpleNamespace(DMatrix=object, XGBClassifier=object))
+    sys.modules.setdefault("lightgbm", types.SimpleNamespace(Dataset=object, LGBMClassifier=object))
+    sys.modules.setdefault("sklearn", types.SimpleNamespace())
+
 @pytest.fixture(autouse=True, scope="session")
 def _block_network_session():
     if os.getenv("ALLOW_NETWORK_TESTS") == "1":
