@@ -56,7 +56,8 @@ def test_build_feature_df_happy_path():
         "a":[1,2,3],
         "b":[0,0,0],
         "label":[0,1,0],
-        "game_date": pd.to_datetime(["2025-01-01","2025-01-02","2025-01-03"])
+        "game_date": pd.to_datetime(["2025-01-01","2025-01-02","2025-01-03"]),
+        "events": ["UNK","UNK","UNK"]
     })
 
 
