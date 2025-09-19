@@ -2,7 +2,6 @@ import sys, types, importlib, pytest, pandas as pd
 pytestmark = pytest.mark.unit
 
 def test_fit_model_minimal_joblib_shim():
-    # Shim joblib so module import and any no-op save/load don't explode
     sys.modules.setdefault("joblib", types.SimpleNamespace(dump=lambda *a, **k: None,
                                                           load=lambda *a, **k: None))
     try:
@@ -14,7 +13,6 @@ def test_fit_model_minimal_joblib_shim():
     if not callable(fit):
         pytest.skip("fit_model not available")
 
-    # Tiny toy data (no network, no files)
     X = pd.DataFrame({"x":[0,1,0,1]})
     y = pd.Series([0,1,0,1])
     model = fit(X, y)
