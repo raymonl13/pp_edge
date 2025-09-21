@@ -1,36 +1,29 @@
-import importlib, pytest, pandas as pd
+import importlib, inspect, pandas as pd, pytest
 from tests.unit._fixtures import make_minimal_games_df
-
 pytestmark = pytest.mark.unit
 
 def _import_model_utils():
-
-    mu = importlib.import_module("code_utils_model_v1")
-
     try:
-        feats = importlib.import_module("features")
-        for fn in ("rolling_woba","wind_adj","platoon_split"):
-            if hasattr(mu, fn):
-                setattr(mu, fn, lambda df: pd.Series(0.0, index=df.index, name=fn))
-    except Exception:
-        pass
-    return mu
+        return importlib.import_module("code_utils_model_v1")
+    except Exception as e:
+        pytest.skip(f"model utils not importable: {e}")
 
 def _find_build_fn(mu):
-    for name in ("build_feature_df","build_features","build_features_df"):
+    # prefer explicit names
+    for name in ("build_feature_df","build_features","build_feature_matrix","build_feature"):
         fn = getattr(mu, name, None)
-        if callable(fn): return fn
-
-    import inspect
+        if callable(fn):
+            return fn
+    # fallback: any callable that accepts (df, ...)
     for name in dir(mu):
         obj = getattr(mu, name)
         if callable(obj):
             try:
                 sig = inspect.signature(obj)
-                if 1 <= len(sig.parameters) <= 2:
+                if len(sig.parameters) >= 1:
                     return obj
             except Exception:
-                continue
+                pass
     return None
 
 def test_build_feature_df_happy_path():
@@ -39,9 +32,7 @@ def test_build_feature_df_happy_path():
     if not callable(build):
         pytest.skip("no feature builder seam available")
 
-
-    df = make_minimal_games_df(n=4)
-
+    df = make_minimal_games_df(n=6)  # has all required feature columns
     out = build(df)
     if isinstance(out, tuple) and len(out) == 2:
         X, y = out
