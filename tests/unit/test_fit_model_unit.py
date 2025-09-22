@@ -8,11 +8,9 @@ def _import_model_utils():
         pytest.skip(f"model utils not importable: {e}")
 
 def _find_fit_fn(mu):
-    # prefer explicit names
     for name in ("fit_model","train_model","fit"):
         fn = getattr(mu, name, None)
-        if callable(fn):
-            return fn
+        if callable(fn): return fn
     # fallback by signature (X, y, ...)
     for name in dir(mu):
         obj = getattr(mu, name)
