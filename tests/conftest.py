@@ -1,20 +1,24 @@
-import os, sys, types, importlib, socket, pytest
+import os, sys, types, socket, pytest, pandas as pd
 
-def _zero_series(df):
-    import pandas as pd
-    return pd.Series(0.0, index=df.index, name="stub")
+def _zero_series(df=None, *a, **k):
+    if df is None:
+        return pd.Series([], dtype=float)
+    return pd.Series([0.0] * len(df), index=getattr(df, "index", None), name="stub")
 
 def _install_unit_feature_stubs():
     if os.getenv("PP_EDGE_TEST_MODE") != "1":
         return
     pkg = types.ModuleType("features")
-    for name in ("rolling_woba", "wind_adj", "platoon_split"):
-        setattr(pkg, name, _zero_series)
+    def __getattr__(name):
+        return _zero_series
+    pkg.__getattr__ = __getattr__
+    for n in ("rolling_woba", "wind_adj", "platoon_split", "barrel_pct", "pitcher_swstr"):
+        setattr(pkg, n, _zero_series)
     sys.modules["features"] = pkg
     try:
-        mu = importlib.import_module("code_utils_model_v1")
-        for name in ("rolling_woba", "wind_adj", "platoon_split"):
-            setattr(mu, name, _zero_series)
+        mu = __import__("code_utils_model_v1")
+        for n in ("rolling_woba", "wind_adj", "platoon_split", "barrel_pct", "pitcher_swstr"):
+            setattr(mu, n, _zero_series)
     except Exception:
         pass
 
