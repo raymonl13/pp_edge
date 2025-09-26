@@ -70,19 +70,10 @@ jobs:
           python scripts/check_argparse_import.py || true
 
       - name: Run tests with coverage (unit tier)
-        env:
-          PP_EDGE_TEST_MODE: '1'
-          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/scripts
-        run: |
-          echo "PP_EDGE_TEST_MODE=$PP_EDGE_TEST_MODE" && pytest --version
-          pytest --collect-only -q -o testpaths=tests/unit | tee pytest_collect.txt | sed -n '1,200p'
-          set -o pipefail
-          pytest -q --disable-warnings --maxfail=1 -ra -o testpaths=tests/unit \
-            --cov=. \
-            --cov-config=.coveragerc \
-            --cov-report=xml:coverage.xml \
-            --cov-report=term-missing
-
+      run: |
+        export PP_EDGE_TEST_MODE=1
+        export PYTHONPATH="$GITHUB_WORKSPACE:$GITHUB_WORKSPACE/scripts"
+        python -m pytest --cov-config=.coveragerc
       - name: Ensure coverage.xml exists
         run: |
           test -f coverage.xml || echo '<coverage line-rate="0.0"/>' > coverage.xml
