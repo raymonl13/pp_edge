@@ -37,6 +37,16 @@ jobs:
           PY
 
       - name: Upload coverage.xml
+      - name: Coverage gate (70%)
+        run: |
+          python - <<"PY"
+          import xml.etree.ElementTree as ET, sys
+          r=ET.parse("coverage.xml").getroot()
+          pct=float(r.get("line-rate",0))*100
+          thr=70.0
+          print(f"Coverage total: {pct:.1f}% (threshold {thr:.0f}%)")
+          sys.exit(0 if pct>=thr else 1)
+          PY
         uses: actions/upload-artifact@v4
         with:
           name: coverage-xml
