@@ -2,17 +2,16 @@
 source =
     .
 omit =
-    */.venv/*
+    */tests/*
+    */scripts/*
     */venv/*
+    */.venv/*
     */site-packages/*
-    tests/*
-    scripts/*
-    */__pycache__/*
+    app.py
+    code_cli_*.py
+    code_data_ingest_*.py
 
 [report]
 exclude_lines =
-    if __name__ == "__main__":
     pragma: no cover
-
-precision = 0
-show_missing = True
+    if __name__ == .__main__.:
