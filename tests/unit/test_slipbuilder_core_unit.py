@@ -1,49 +1,25 @@
-import importlib, inspect, pytest
+import pytest
+try:
+    from code_utils_slipbuilder_v2 import SlipBuilder
+except Exception:
+    SlipBuilder = None
 pytestmark = pytest.mark.unit
-
-def _load():
-    try:
-        return importlib.import_module("code_utils_slipbuilder_v2")
-    except Exception as e:
-        pytest.skip(f"slipbuilder not importable: {e}")
-
-def test_minimal_branch_paths():
-    mod = _load()
-
-    # prefer a validate/build function first
-    for name in ("validate_pick","validate","build_slips","build"):
-        fn = getattr(mod, name, None)
-        if callable(fn):
-            sig = inspect.signature(fn)
-            kwargs = {}
-            for k,p in sig.parameters.items():
-                if p.default is not inspect._empty:  # has default
-                    continue
-                # minimal dummies for common params
-                if k in {"picks","legs","items"}: kwargs[k] = []
-                elif k in {"max_slips","limit"}: kwargs[k] = 0
-                elif k in {"allow_duplicates","dry_run","strict"}: kwargs[k] = True
-                else:
-                    break
-            else:
-                _ = fn(**kwargs)
-                return
-
-    # otherwise exercise a minimal method on a builder class
-    for attr in dir(mod):
-        if "builder" in attr.lower():
-            cls = getattr(mod, attr)
-            if isinstance(cls, type):
-                try:
-                    obj = cls()
-                except Exception:
-                    continue
-                for m in ("validate","reset","build","build_slips"):
-                    if hasattr(obj, m) and callable(getattr(obj, m)):
-                        try:
-                            getattr(obj, m)()
-                        except TypeError:
-                            try: getattr(obj, m)([])
-                            except Exception: pass
-                        return
-    pytest.skip("no safe minimal slipbuilder path found")
+def _cfg():
+    return {"diversification":{"demon_quota_per_slip":1,"demon_quota_per_day":2},"payouts":{"Power2":3.0}}
+def test_slipbuilder_builds_top_pair_respecting_rules():
+    if SlipBuilder is None:
+        pytest.skip("SlipBuilder not available")
+    sb = SlipBuilder(_cfg(), demons_used_today=0)
+    legs = [
+        {"player":"A","p_hit":0.72,"edge_pp":0.12,"game_id":"g1"},
+        {"player":"B","p_hit":0.70,"edge_pp":0.11,"game_id":"g2"},
+        {"player":"B","p_hit":0.70,"edge_pp":0.11,"game_id":"g3"},
+        {"player":"C","p_hit":0.58,"edge_pp":0.02,"game_id":"g4"},
+    ]
+    slips = sb.build_slips(legs)
+    assert slips
+    s = slips[0]
+    assert s.get("slip_type") == "Power2"
+    assert len(s.get("legs",[])) == 2
+    players = {l["player"] for l in s["legs"]}
+    assert "A" in players and "B" in players

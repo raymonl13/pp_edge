@@ -1,26 +1,30 @@
-import importlib, inspect, pytest, numpy as np, pandas as pd
+import importlib, inspect, numpy as np, pandas as pd, pytest
 pytestmark = pytest.mark.unit
-
-def _load():
-    try:
-        return importlib.import_module("monte_carlo_bankroll")
-    except Exception as e:
-        pytest.skip(f"monte_carlo_bankroll not importable: {e}")
-
-def test_simulate_payout_kw_vs_column_paths():
-    mc = _load()
-    sim = getattr(mc, "simulate", None)
-    if sim is None or not callable(sim): pytest.skip("simulate() not available")
-    edges = pd.DataFrame({"edge":[0.05, 0.00, -0.02], "payout":[2.0,2.0,2.0], "win_prob":[0.5,0.5,0.5]})
+def _find_sim():
+    for modname in ("monte_carlo_bankroll","monte_carlo","mc"):
+        try:
+            mod = importlib.import_module(modname)
+        except Exception:
+            continue
+        sim = getattr(mod, "simulate", None)
+        if callable(sim):
+            return sim
+    return None
+def _call(sim, edges, runs=128, seed=11, as_kwargs=False):
     sig = inspect.signature(sim)
-    kwargs = {"edges": edges, "runs": 50, "seed": 123}
-    if "unit" in sig.parameters: kwargs["unit"]=1.0
-    if "win_prob" in sig.parameters: kwargs["win_prob"]=0.5
-
-    # path A: payout as kw if supported
-    a_kwargs = dict(kwargs)
-    if "payout" in sig.parameters: a_kwargs["payout"]=2.0
-    a = np.asarray(sim(**a_kwargs), dtype=float); assert len(a)==50
-
-    # path B: payout via column only
-    b = np.asarray(sim(**kwargs), dtype=float); assert len(b)==50
+    if as_kwargs:
+        kw = {}
+        for k,v in {"edges":edges,"runs":runs,"seed":seed,"unit":1.0,"payout":2.5,"win_prob":0.57}.items():
+            if k in sig.parameters:
+                kw[k] = v
+        return sim(**kw)
+    return sim(edges, runs) if len(sig.parameters) < 3 else sim(edges=edges, runs=runs, seed=seed)
+def test_mc_payout_path_deterministic():
+    sim = _find_sim()
+    if sim is None:
+        pytest.skip("simulate() not available")
+    edges = pd.DataFrame({"edge":[0.02,0.01,0.00,-0.01], "payout":[2.5]*4, "win_prob":[0.57,0.53,0.50,0.47]})
+    r1 = np.asarray(_call(sim, edges, runs=128, seed=11, as_kwargs=True), dtype=float)
+    r2 = np.asarray(_call(sim, edges, runs=128, seed=11, as_kwargs=True), dtype=float)
+    assert len(r1) == 128 == len(r2)
+    assert np.allclose(r1, r2)
