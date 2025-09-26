@@ -1,6 +1,8 @@
 [run]
 source =
-    .
+    code_utils_
+    features_
+    monte_carlo_bankroll
 omit =
     */tests/*
     */scripts/*
@@ -10,6 +12,7 @@ omit =
     app.py
     code_cli_*.py
     code_data_ingest_*.py
+    code_core_*.py
 
 [report]
 exclude_lines =

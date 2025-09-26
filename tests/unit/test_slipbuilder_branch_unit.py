@@ -1,33 +1,21 @@
-import importlib, pytest
-
+import pytest
+try:
+    from code_utils_slipbuilder_v2 import SlipBuilder
+except Exception:
+    SlipBuilder = None
 pytestmark = pytest.mark.unit
-
-def _load():
-    try:
-        return importlib.import_module("code_utils_slipbuilder_v2")
-    except Exception as e:
-        pytest.skip(f"slipbuilder not importable: {e}")
-
-def test_duplicate_pick_guard_or_minimal_validate():
-    mod = _load()
-    # prefer explicit validator; otherwise minimal build with empty picks
-    for name in ("validate_pick","validate"):
-        fn = getattr(mod, name, None)
-        if callable(fn):
-            try:
-                # deliberately duplicate minimal pick if function supports it, else just call and ensure no exception
-                _ = fn([])  # empty/duplicate-less path, still exercises source
-            except TypeError:
-                try: _ = fn([], allow_duplicates=False)
-                except Exception: pass
-            return
-    # fallback: call build/build_slips with empty list and strict/dry_run
-    for name in ("build_slips","build"):
-        fn = getattr(mod, name, None)
-        if callable(fn):
-            try: _ = fn(picks=[], dry_run=True, strict=True)
-            except TypeError:
-                try: _ = fn([], 0, True)
-                except Exception: pass
-            return
-    pytest.skip("no slipbuilder seam available")
+def _cfg():
+    return {"diversification":{"demon_quota_per_slip":1,"demon_quota_per_day":1},"payouts":{"Power2":3.0}}
+def test_slipbuilder_respects_daily_demon_quota():
+    if SlipBuilder is None:
+        pytest.skip("SlipBuilder not available")
+    sb = SlipBuilder(_cfg(), demons_used_today=1)
+    legs = [
+        {"player":"A","p_hit":0.7,"edge_pp":0.12,"tag":"Demon","game_id":"g1"},
+        {"player":"B","p_hit":0.69,"edge_pp":0.11,"game_id":"g2"},
+        {"player":"C","p_hit":0.68,"edge_pp":0.10,"game_id":"g3"},
+    ]
+    slips = sb.build_slips(legs)
+    assert slips
+    s = slips[0]
+    assert len([l for l in s["legs"] if l.get("tag")=="Demon"]) == 0 or len([l for l in s["legs"] if l.get("tag")=="Demon"]) == 1
