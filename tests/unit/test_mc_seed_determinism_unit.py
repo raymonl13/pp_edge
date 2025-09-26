@@ -1,4 +1,4 @@
-import importlib, inspect, numpy as np, pandas as pd, pytest
+import importlib, inspect, pandas as pd, numpy as np, pytest
 pytestmark = pytest.mark.unit
 def _find_sim():
     for modname in ("monte_carlo_bankroll","monte_carlo","mc"):
@@ -10,7 +10,7 @@ def _find_sim():
         if callable(sim):
             return sim
     return None
-def _call_sim(sim, edges, runs=128, seed=7):
+def _call_sim(sim, edges, runs=100, seed=42):
     sig = inspect.signature(sim)
     kw = {}
     defaults = {"edges":edges, "runs":runs, "seed":seed, "unit":1.0, "payout":2.0, "win_prob":0.55}
@@ -18,12 +18,12 @@ def _call_sim(sim, edges, runs=128, seed=7):
         if name in sig.parameters:
             kw[name] = defaults[name]
     return sim(**kw)
-def test_simulate_deterministic_seed():
+def test_mc_seed_determinism():
     sim = _find_sim()
     if sim is None:
         pytest.skip("simulate() not available")
-    edges = pd.DataFrame({"edge":[0.03,0.00,-0.01,0.05], "payout":[2.0]*4, "win_prob":[0.54,0.50,0.49,0.58]})
-    r1 = np.asarray(_call_sim(sim, edges, runs=128, seed=7), dtype=float)
-    r2 = np.asarray(_call_sim(sim, edges, runs=128, seed=7), dtype=float)
-    assert len(r1) == 128 == len(r2)
+    edges = pd.DataFrame({"edge":[0.05,0.00,-0.02],"payout":[2.0,2.0,2.0],"win_prob":[0.55,0.50,0.45]})
+    r1 = np.asarray(_call_sim(sim, edges, runs=100, seed=42), dtype=float)
+    r2 = np.asarray(_call_sim(sim, edges, runs=100, seed=42), dtype=float)
+    assert len(r1) == 100 == len(r2)
     assert np.allclose(r1, r2)
