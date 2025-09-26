@@ -5,7 +5,6 @@ source =
     features_travel_miles
     monte_carlo_bankroll
 omit =
-    code_utils_model_v1.py
     */tests/*
     */scripts/*
     */venv/*
@@ -15,7 +14,6 @@ omit =
     code_cli_*.py
     code_data_ingest_*.py
     code_core_*.py
-
 [report]
 exclude_lines =
     pragma: no cover
