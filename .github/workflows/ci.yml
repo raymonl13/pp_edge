@@ -27,19 +27,31 @@ jobs:
           PP_EDGE_TEST_MODE: "1"
           PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/scripts
         run: |
-          python -c "import pytest,sys; print('pytest', pytest.__version__); sys.stdout.flush()"
-          python -m pytest --cov-config=.coveragerc
+          set -e
+          python -c "import pytest,sys; print('pytest', pytest.__version__)"
+          python -m pytest -o testpaths=tests/unit --maxfail=1 --cov-config=.coveragerc --disable-warnings -vv | tee unit-log.txt
           python - <<'PY'
           import xml.etree.ElementTree as ET
           r = ET.parse("coverage.xml").getroot()
-          pct = float(r.get("line-rate", 0)) * 100
+          pct = float(r.get("line-rate", 0))*100
           print(f"Coverage total: {pct:.1f}% (unit lane)")
           PY
 
       - name: Upload coverage.xml
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+
+      - name: Upload unit log
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-log
+          path: unit-log.txt
+
       - name: Coverage gate (70%)
         run: |
-          python - <<"PY"
+          python - <<'PY'
           import xml.etree.ElementTree as ET, sys
           r=ET.parse("coverage.xml").getroot()
           pct=float(r.get("line-rate",0))*100
@@ -47,7 +59,3 @@ jobs:
           print(f"Coverage total: {pct:.1f}% (threshold {thr:.0f}%)")
           sys.exit(0 if pct>=thr else 1)
           PY
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-xml
-          path: coverage.xml
