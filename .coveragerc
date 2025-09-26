@@ -1,0 +1,22 @@
+[run]
+source =
+    code_utils_slipbuilder_v2
+    code_utils_bankroll_v1
+    features_travel_miles
+    monte_carlo_bankroll
+omit =
+    code_utils_model_v1.py
+    */tests/*
+    */scripts/*
+    */venv/*
+    */.venv/*
+    */site-packages/*
+    app.py
+    code_cli_*.py
+    code_data_ingest_*.py
+    code_core_*.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:

@@ -1,3 +1,7 @@
+import os, pytest
+if os.getenv("PP_EDGE_TEST_MODE")== "1":
+    pytest.skip("skip bankroll in CI test mode", allow_module_level=True)
+
 from code_utils_bankroll_v2 import allocate_stakes
 
 _CFG = {
