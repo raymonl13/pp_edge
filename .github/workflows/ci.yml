@@ -23,12 +23,16 @@ jobs:
           pip install pytest pytest-cov pandas numpy pyyaml requests
 
       - name: Run tests with coverage (unit tier)
-        env:
-          PP_EDGE_TEST_MODE: "1"
-          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/scripts
-        run: |
-          python -m pytest --cov-config=.coveragerc
-
+      run: |
+        python -c "import pytest; print(\"pytest\", pytest.__version__)"
+        echo PP_EDGE_TEST_MODE=$PP_EDGE_TEST_MODE
+        echo PYTHONPATH=$PYTHONPATH
+        python -m pytest --cov-config=.coveragerc
+        python - <<"PY"
+        import xml.etree.ElementTree as ET
+        r=ET.parse("coverage.xml").getroot()
+        print(f"Coverage total: {float(r.get(0,0))*100:.1f}% (unit lane)")
+        PY
       - name: Upload coverage.xml
       - name: Echo coverage percent
         run: |
