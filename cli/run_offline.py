@@ -8,14 +8,9 @@ CFG = {
 }
 
 def _row_to_leg(r):
-    d = {
-        "player": r["player"],
-        "game_id": r["game_id"],
-        "p_hit": float(r["p_hit"]),
-        "edge_pp": float(r["edge_pp"]),
-    }
-    if r.get("tag"):
-        d["tag"] = r["tag"]
+    d = {"player": r["player"], "game_id": r["game_id"],
+         "p_hit": float(r["p_hit"]), "edge_pp": float(r["edge_pp"])}
+    if r.get("tag"): d["tag"] = r["tag"]
     return d
 
 def load_legs(path):
@@ -26,32 +21,19 @@ def maybe_apply_model(legs):
     if not Path("model_v2.pkl").exists():
         return legs
     try:
-        from code_utils_model_v1 import predict_batch  # optional seam
+        from code_utils_model_v1 import predict_batch
     except Exception:
         return legs
     try:
-        # Build a tiny dataframe adapter without importing pandas if not needed
-        cols = ["player", "game_id", "p_hit", "edge_pp", "tag"]
-        rows = []
-        for g in legs:
-            rows.append({
-                "player": g.get("player"),
-                "game_id": g.get("game_id"),
-                "p_hit": g.get("p_hit"),
-                "edge_pp": g.get("edge_pp"),
-                "tag": g.get("tag"),
-            })
-        # If predict_batch needs pandas, it can construct it internally;
-        # contract: returns an iterable of floats in [0,1] aligned with legs
-        new_phit = list(predict_batch(rows))
-        if len(new_phit) == len(legs):
-            for i, p in enumerate(new_phit):
-                try:
-                    legs[i]["p_hit"] = float(p)
-                except Exception:
-                    pass
+        rows = [{"player":g.get("player"),"game_id":g.get("game_id"),
+                 "p_hit":g.get("p_hit"),"edge_pp":g.get("edge_pp"),
+                 "tag":g.get("tag")} for g in legs]
+        new_p = list(predict_batch(rows))
+        if len(new_p) == len(legs):
+            for i, p in enumerate(new_p):
+                try: legs[i]["p_hit"] = float(p)
+                except Exception: pass
     except Exception:
-        # Fail-soft: never crash the lane if model call hiccups
         return legs
     return legs
 
@@ -69,20 +51,30 @@ def main(fixtures="fixtures/slate_small.csv", out_path="out/slips.json", unit=1.
         print("SlipBuilder seam not available", file=sys.stderr)
         return 2
 
+    from code_utils_slipqa_v1 import qa_slip
+
     legs = load_legs(fixtures)
     legs = maybe_apply_model(legs)
 
     sb = SlipBuilder(CFG)
     slips = sb.build_slips(legs)
 
-    # Minimal bankroll: unit per slip for now
     for s in slips:
         s["stake_total"] = unit
+        s["_qa_flags"] = qa_slip(s, CFG)
+
+    approved = [s for s in slips if not any(s["_qa_flags"].values())]
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    # Approved-only output for direct use
     with open(out_path, "w") as f:
+        json.dump({"slips": approved}, f, indent=2)
+    # Review file with flags for all slips
+    review_path = os.path.join(os.path.dirname(out_path), "slips_review.json")
+    with open(review_path, "w") as f:
         json.dump({"slips": slips}, f, indent=2)
-    print(f"wrote {out_path} with {len(slips)} slips")
+
+    print(f"wrote {out_path} with {len(approved)} approved slips; review at {review_path}")
     return 0
 
 if __name__ == "__main__":
