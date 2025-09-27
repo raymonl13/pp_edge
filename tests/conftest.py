@@ -26,5 +26,5 @@ def _no_network_in_unit_lane(monkeypatch):
     monkeypatch.setattr(socket, "create_connection", _blocked)
     try: yield
     finally: monkeypatch.setattr(socket, "create_connection", orig)
-def pytest_ignore_collect(collection_path: pathlib.Path, path=None):  # pytest>=8 signature
+def pytest_ignore_collect(collection_path: pathlib.Path, path=None):
     return "tests/legacy/" in str(collection_path)
