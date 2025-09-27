@@ -203,3 +203,11 @@ Workflow: `.github/workflows/live_submit.yml`
 * Pytest runs with  
   ```bash
   pytest --cov=pp_edge --cov=utils --cov-report=xml
+
+- Module: `code_utils_bankroll_alloc_v1.allocate_slips`.
+- CLI flags (in `cli/run_offline.py`):
+  - `--bankroll` (>0 enables allocator; else falls back to `--unit`)
+  - `--slip-cap`, `--slate-cap-frac`, `--kelly`, `--min-stake`, `--allow-neg-ev`
+- Outputs:
+  - `out/slips.json` (approved + staked)
+  - `out/slips_review.json` (all slips + QA flags)
