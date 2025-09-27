@@ -30,3 +30,6 @@ dashboard_v3/dist/
 .DS_Store
 
 !.coveragerc
+
+# keep our tiny offline fixtures
+!fixtures/
