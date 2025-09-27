@@ -211,3 +211,6 @@ Workflow: `.github/workflows/live_submit.yml`
 - Outputs:
   - `out/slips.json` (approved + staked)
   - `out/slips_review.json` (all slips + QA flags)
+## R6 — Correlation & Diversity (soft QA)
+Adds soft flags in `code_utils_slipqa_v1.qa_slip`: `low_diversity_games`, `duplicate_player`, `correlated_group`.
+Hard filters remain: `neg_ev`, `demon_quota_exceeded`. Approved slips exclude only hard flags; soft flags appear in `out/slips_review.json`.
