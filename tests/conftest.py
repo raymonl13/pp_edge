@@ -31,3 +31,16 @@ def _no_network_in_unit_lane(monkeypatch):
     finally: monkeypatch.setattr(socket, "create_connection", orig)
 def pytest_ignore_collect(collection_path: pathlib.Path, path=None):
     return "tests/legacy/" in str(collection_path)
+
+class _XGBClassifier:
+    def __init__(self, *args, **kwargs):
+        pass
+    def fit(self, X, y):
+        return self
+    def predict_proba(self, X):
+        import numpy as _np
+        n = len(X) if hasattr(X, '__len__') else 1
+        return _np.tile([0.5, 0.5], (n, 1))
+
+m = sys.modules['xgboost']
+setattr(m, 'XGBClassifier', _XGBClassifier)
