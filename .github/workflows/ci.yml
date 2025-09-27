@@ -14,11 +14,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.9"
-      - name: Install deps (lean)
+      - name: Install deps
         run: |
           python -m pip install --upgrade pip
           pip install pytest pytest-cov pandas numpy pyyaml requests scikit-learn
-      - name: Run tests with coverage (unit tier)
+      - name: Run tests with coverage
         env:
           PP_EDGE_TEST_MODE: "1"
           PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/scripts
