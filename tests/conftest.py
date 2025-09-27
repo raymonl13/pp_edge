@@ -44,3 +44,22 @@ class _XGBClassifier:
 
 m = sys.modules['xgboost']
 setattr(m, 'XGBClassifier', _XGBClassifier)
+
+class _XGBClassifier:
+    def __init__(self, **kwargs):
+        self._params = dict(kwargs)
+    def get_params(self, deep=True):
+        return dict(self._params)
+    def set_params(self, **params):
+        self._params.update(params)
+        return self
+    def fit(self, X, y):
+        return self
+    def predict_proba(self, X):
+        import numpy as _np
+        n = len(X) if hasattr(X, '__len__') else 1
+        return _np.tile([0.5, 0.5], (n, 1))
+
+# rebind onto the shimmed xgboost module
+m = sys.modules['xgboost']
+setattr(m, 'XGBClassifier', _XGBClassifier)
