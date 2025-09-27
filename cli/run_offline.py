@@ -1,25 +1,90 @@
-import os, csv, json, sys
-os.environ.setdefault("PP_EDGE_TEST_MODE","1")
-CFG={"diversification":{"demon_quota_per_slip":1,"demon_quota_per_day":2},"payouts":{"Power2":3.0,"Power3":5.0}}
+import os, csv, json, sys, argparse
+from pathlib import Path
+os.environ.setdefault("PP_EDGE_TEST_MODE", "1")
+
+CFG = {
+    "diversification": {"demon_quota_per_slip": 1, "demon_quota_per_day": 2},
+    "payouts": {"Power2": 3.0, "Power3": 5.0},
+}
+
 def _row_to_leg(r):
-    d={"player":r["player"],"game_id":r["game_id"],"p_hit":float(r["p_hit"]), "edge_pp":float(r["edge_pp"])}
-    if r.get("tag"): d["tag"]=r["tag"]
+    d = {
+        "player": r["player"],
+        "game_id": r["game_id"],
+        "p_hit": float(r["p_hit"]),
+        "edge_pp": float(r["edge_pp"]),
+    }
+    if r.get("tag"):
+        d["tag"] = r["tag"]
     return d
+
 def load_legs(path):
-    with open(path,newline="") as f:
+    with open(path, newline="") as f:
         return [_row_to_leg(r) for r in csv.DictReader(f)]
-def main(fixtures="fixtures/slate_small.csv", out_path="out/slips.json"):
+
+def maybe_apply_model(legs):
+    if not Path("model_v2.pkl").exists():
+        return legs
+    try:
+        from code_utils_model_v1 import predict_batch  # optional seam
+    except Exception:
+        return legs
+    try:
+        # Build a tiny dataframe adapter without importing pandas if not needed
+        cols = ["player", "game_id", "p_hit", "edge_pp", "tag"]
+        rows = []
+        for g in legs:
+            rows.append({
+                "player": g.get("player"),
+                "game_id": g.get("game_id"),
+                "p_hit": g.get("p_hit"),
+                "edge_pp": g.get("edge_pp"),
+                "tag": g.get("tag"),
+            })
+        # If predict_batch needs pandas, it can construct it internally;
+        # contract: returns an iterable of floats in [0,1] aligned with legs
+        new_phit = list(predict_batch(rows))
+        if len(new_phit) == len(legs):
+            for i, p in enumerate(new_phit):
+                try:
+                    legs[i]["p_hit"] = float(p)
+                except Exception:
+                    pass
+    except Exception:
+        # Fail-soft: never crash the lane if model call hiccups
+        return legs
+    return legs
+
+def build_parser():
+    p = argparse.ArgumentParser()
+    p.add_argument("fixtures", nargs="?", default="fixtures/slate_small.csv")
+    p.add_argument("out_path", nargs="?", default="out/slips.json")
+    p.add_argument("--unit", type=float, default=1.0)
+    return p
+
+def main(fixtures="fixtures/slate_small.csv", out_path="out/slips.json", unit=1.0):
     try:
         from code_utils_slipbuilder_v2 import SlipBuilder
     except Exception:
-        print("SlipBuilder seam not available", file=sys.stderr); return 2
-    legs=load_legs(fixtures)
-    sb=SlipBuilder(CFG)
-    slips=sb.build_slips(legs)
+        print("SlipBuilder seam not available", file=sys.stderr)
+        return 2
+
+    legs = load_legs(fixtures)
+    legs = maybe_apply_model(legs)
+
+    sb = SlipBuilder(CFG)
+    slips = sb.build_slips(legs)
+
+    # Minimal bankroll: unit per slip for now
+    for s in slips:
+        s["stake_total"] = unit
+
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    with open(out_path,"w") as f:
-        json.dump({"slips":slips}, f, indent=2)
+    with open(out_path, "w") as f:
+        json.dump({"slips": slips}, f, indent=2)
     print(f"wrote {out_path} with {len(slips)} slips")
     return 0
-if __name__=="__main__":
-    sys.exit(main(*(sys.argv[1:])))
+
+if __name__ == "__main__":
+    args = build_parser().parse_args()
+    sys.exit(main(args.fixtures, args.out_path, args.unit))
