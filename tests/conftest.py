@@ -1,3 +1,6 @@
+import sys, types
+if 'xgboost' not in sys.modules:
+    sys.modules['xgboost'] = types.ModuleType('xgboost')
 import os, sys, types, socket, pathlib, pytest, pandas as pd
 def _zero_series(df=None, *_, **__):
     if df is None: return pd.Series([], dtype=float)
