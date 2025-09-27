@@ -41,10 +41,17 @@ def build_parser():
     p = argparse.ArgumentParser()
     p.add_argument("fixtures", nargs="?", default="fixtures/slate_small.csv")
     p.add_argument("out_path", nargs="?", default="out/slips.json")
-    p.add_argument("--unit", type=float, default=1.0)
+    p.add_argument("--unit", type=float, default=1.0, help="Legacy flat stake (used if --bankroll <= 0)")
+    p.add_argument("--bankroll", type=float, default=0.0, help="Total bankroll; if >0 uses allocator")
+    p.add_argument("--slip-cap", type=float, default=2.0, help="Max stake per slip")
+    p.add_argument("--slate-cap-frac", type=float, default=0.10, help="Max fraction of bankroll to deploy")
+    p.add_argument("--kelly", type=float, default=0.5, help="Kelly-lite multiplier on edge")
+    p.add_argument("--min-stake", type=float, default=0.0, help="Minimum stake per slip to keep")
+    p.add_argument("--allow-neg-ev", action="store_true", help="Allow negative EV slips through allocator")
     return p
 
-def main(fixtures="fixtures/slate_small.csv", out_path="out/slips.json", unit=1.0):
+def main(fixtures="fixtures/slate_small.csv", out_path="out/slips.json", unit=1.0,
+         bankroll=0.0, slip_cap=2.0, slate_cap_frac=0.10, kelly=0.5, min_stake=0.0, allow_neg_ev=False):
     try:
         from code_utils_slipbuilder_v2 import SlipBuilder
     except Exception:
@@ -52,6 +59,7 @@ def main(fixtures="fixtures/slate_small.csv", out_path="out/slips.json", unit=1.
         return 2
 
     from code_utils_slipqa_v1 import qa_slip
+    from code_utils_bankroll_alloc_v1 import allocate_slips
 
     legs = load_legs(fixtures)
     legs = maybe_apply_model(legs)
@@ -59,24 +67,43 @@ def main(fixtures="fixtures/slate_small.csv", out_path="out/slips.json", unit=1.
     sb = SlipBuilder(CFG)
     slips = sb.build_slips(legs)
 
+    # QA flags
     for s in slips:
-        s["stake_total"] = unit
         s["_qa_flags"] = qa_slip(s, CFG)
 
+    # Allocation
     approved = [s for s in slips if not any(s["_qa_flags"].values())]
+    if bankroll and bankroll > 0:
+        staked = allocate_slips(
+            approved, bankroll=bankroll, slip_cap=slip_cap,
+            slate_cap_frac=slate_cap_frac, kelly=kelly,
+            min_stake=min_stake, allow_neg_ev=allow_neg_ev
+        )
+    else:
+        # legacy flat unit if no bankroll specified
+        staked = []
+        for s in approved:
+            s = dict(s)
+            s["stake_total"] = unit
+            staked.append(s)
 
+    # write outputs
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    # Approved-only output for direct use
     with open(out_path, "w") as f:
-        json.dump({"slips": approved}, f, indent=2)
-    # Review file with flags for all slips
+        json.dump({"slips": staked}, f, indent=2)
+
     review_path = os.path.join(os.path.dirname(out_path), "slips_review.json")
     with open(review_path, "w") as f:
         json.dump({"slips": slips}, f, indent=2)
 
-    print(f"wrote {out_path} with {len(approved)} approved slips; review at {review_path}")
+    print(f"wrote {out_path} with {len(staked)} approved slips; review at {review_path}")
     return 0
 
 if __name__ == "__main__":
     args = build_parser().parse_args()
-    sys.exit(main(args.fixtures, args.out_path, args.unit))
+    sys.exit(main(
+        args.fixtures, args.out_path, args.unit,
+        bankroll=args.bankroll, slip_cap=args.slip_cap,
+        slate_cap_frac=args.slate_cap_frac, kelly=args.kelly,
+        min_stake=args.min_stake, allow_neg_ev=args.allow_neg_ev
+    ))
