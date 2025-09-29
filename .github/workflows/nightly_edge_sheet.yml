@@ -49,7 +49,14 @@ jobs:
         run: |
           set -euo pipefail
           cd model_assets
-          sha256sum -c model_v2.sha256
+          if grep -q ' ' model_v2.sha256; then
+            # checksum file has 'HASH  filename' format
+            sha256sum -c model_v2.sha256
+          else
+            # checksum file has only the hash; synthesize the expected line
+            LINE=$(tr -d '\r\n' < model_v2.sha256)
+            echo "$LINE  model_v2.pkl" | sha256sum -c -
+          fi
 
       - name: Run edge sheet via CLI
         id: sheet
