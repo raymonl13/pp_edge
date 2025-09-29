@@ -18,12 +18,27 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y jq curl
 
-      - name: List assets from Release tag
+      - name: Download model artefacts from GitHub Release (auth)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: v0.11.0-rc1
         run: |
           set -euo pipefail
+          mkdir -p model_assets
           rel=$(curl -fsSL -H "Authorization: token $GITHUB_TOKEN" \
                 "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG")
-          echo "$rel" | jq -r '.assets[].name'
+          id_pkl=$(echo "$rel" | jq -r '.assets[] | select(.name=="model_v2.pkl") | .id')
+          id_sha=$(echo "$rel" | jq -r '.assets[] | select(.name=="model_v2.sha256") | .id')
+          test -n "$id_pkl" && test -n "$id_sha" || { echo "Release assets not found for tag $TAG"; exit 1; }
+          curl -fsSL -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/octet-stream" \
+               "https://api.github.com/repos/${{ github.repository }}/releases/assets/$id_pkl" \
+               -o model_assets/model_v2.pkl
+          curl -fsSL -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/octet-stream" \
+               "https://api.github.com/repos/${{ github.repository }}/releases/assets/$id_sha" \
+               -o model_assets/model_v2.sha256
+
+      - name: Verify SHA256
+        run: |
+          set -euo pipefail
+          cd model_assets
+          sha256sum -c model_v2.sha256
