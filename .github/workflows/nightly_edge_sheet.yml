@@ -8,15 +8,23 @@ on:
 jobs:
   edge-sheet:
     runs-on: ubuntu-latest
+    env:
+      PP_EDGE_TEST_MODE: ""
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install tools
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - name: Install deps
         run: |
           set -euo pipefail
-          sudo apt-get update -y
-          sudo apt-get install -y jq curl
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          sudo apt-get update -y && sudo apt-get install -y jq curl
 
       - name: Download model artefacts from GitHub Release (auth)
         env:
@@ -42,3 +50,18 @@ jobs:
           set -euo pipefail
           cd model_assets
           sha256sum -c model_v2.sha256
+
+      - name: Run edge sheet via CLI
+        id: sheet
+        run: |
+          set -euo pipefail
+          OUT="edge_sheet_$(date -u +%F).csv"
+          python code_cli_run_edge_sheet_v1.py --date "$(date -u +%F)"
+          test -f "$OUT" || { echo "Edge sheet not found: $OUT"; ls -la; exit 1; }
+          echo "out=$OUT" >> "$GITHUB_OUTPUT"
+
+      - name: Upload edge sheet artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.sheet.outputs.out }}
+          path: ${{ steps.sheet.outputs.out }}
