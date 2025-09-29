@@ -25,15 +25,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Download model artefacts from release
-        env:
-          MODEL_BASE: ${{ secrets.PPEDGE_MODEL_URL }}
-        run: |
-          set -euo pipefail
-          test -n "$MODEL_BASE"
-          mkdir -p model_assets
-          curl -fsSL "$MODEL_BASE/model_v2.pkl" -o model_assets/model_v2.pkl
-          curl -fsSL "$MODEL_BASE/model_v2.sha256" -o model_assets/model_v2.sha256
+      - name: Download model artefacts from GitHub Release (auth)
+
 
       - name: Verify SHA256
         run: |
