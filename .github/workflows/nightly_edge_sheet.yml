@@ -12,12 +12,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.9'
-
-      - name: Sanity
+      - name: Install tools
         run: |
-          python -V
-          echo "workflow skeleton OK"
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y jq curl
+
+      - name: List assets from Release tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: v0.11.0-rc1
+        run: |
+          set -euo pipefail
+          rel=$(curl -fsSL -H "Authorization: token $GITHUB_TOKEN" \
+                "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG")
+          echo "$rel" | jq -r '.assets[].name'
