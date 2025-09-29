@@ -59,50 +59,75 @@ jobs:
           fi
 
       - name: Run edge sheet via offline CLI
+
         id: sheet
+
         run: |
+
           set -euo pipefail
-          OUT="edge_sheet_$(date -u +%F).csv"
 
-          # 1) create a tiny slate inline
+          RUN_DATE="$(date -u +%F)"
+
+          OUT="edge_sheet_${RUN_DATE}.csv"
+
           cat > fixtures_slate.csv <<'CSV'
-player,game_id,p_hit,edge_pp,tag
-A,g1,0.61,0.12,
-B,g2,0.58,0.09,
-C,g3,0.63,0.13,
-D,g4,0.57,0.08,
-E,g5,0.60,0.11,Demon
-F,g6,0.55,0.07,
-CSV
 
-          # 2) run offline CLI (approved slips -> out/slips.json)
+      player,game_id,p_hit,edge_pp,tag
+
+      A,g1,0.61,0.12,
+
+      B,g2,0.58,0.09,
+
+      C,g3,0.63,0.13,
+
+      D,g4,0.57,0.08,
+
+      E,g5,0.60,0.11,Demon
+
+      F,g6,0.55,0.07,
+
+      CSV
+
           python cli/run_offline.py fixtures_slate.csv out/slips.json --cfg config_pp_edge_v6.8.yaml
 
-          # 3) convert approved JSON to a flat edge sheet CSV
           python - <<'PY2'
-import json, pandas as pd
-j = json.load(open("out/slips.json"))
-rows=[]
-for s in j.get("slips", []):
-    for l in s.get("legs", []):
-        rows.append({
-          "player": l.get("player"),
-          "game_id": l.get("game_id"),
-          "p_hit": l.get("p_hit"),
-          "edge_pp": l.get("edge_pp"),
-          "tier": l.get("tier") or l.get("tag"),
-          "slip_type": s.get("slip_type"),
-          "stake_total": s.get("stake_total")
-        })
-pd.DataFrame(rows).to_csv("%s"%f"edge_sheet_{__import__('datetime').date.today().isoformat()}.csv", index=False)
-print("wrote edge sheet")
-PY2
+
+      import os, json, pandas as pd
+
+      out = os.environ["OUT"]
+
+      j = json.load(open("out/slips.json"))
+
+      rows=[]
+
+      for s in j.get("slips", []):
+
+          for l in s.get("legs", []):
+
+              rows.append({
+
+                "player": l.get("player"),
+
+                "game_id": l.get("game_id"),
+
+                "p_hit": l.get("p_hit"),
+
+                "edge_pp": l.get("edge_pp"),
+
+                "tier": l.get("tier") or l.get("tag"),
+
+                "slip_type": s.get("slip_type"),
+
+                "stake_total": s.get("stake_total")
+
+              })
+
+      pd.DataFrame(rows).to_csv(out, index=False)
+
+      print("wrote", out)
+
+      PY2
 
           test -f "$OUT" || { echo "Edge sheet not found: $OUT"; ls -la; exit 1; }
-          echo "out=$OUT" >> "$GITHUB_OUTPUT"
 
-      - name: Upload edge sheet artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.sheet.outputs.out }}
-          path: ${{ steps.sheet.outputs.out }}
+          echo "out=$OUT" >> "$GITHUB_OUTPUT"
