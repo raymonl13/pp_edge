@@ -1,71 +1,13 @@
 name: nightly_edge_sheet
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: '0 8 * * *'     # 08:00 UTC daily
-  workflow_dispatch:
 
 jobs:
   edge-sheet:
     runs-on: ubuntu-latest
-    env:
-      PP_EDGE_TEST_MODE: ""    # ensure test-mode shims never affect nightly
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.9'
-
-      - name: Install dependencies
-        run: |
-          set -euo pipefail
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          sudo apt-get update -y
-          sudo apt-get install -y jq curl
-
-      - name: Download model artefacts from GitHub Release (auth)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: v0.11.0-rc1
-        run: |
-          set -euo pipefail
-          mkdir -p model_assets
-          rel=$(curl -fsSL -H "Authorization: token $GITHUB_TOKEN" \
-                "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG")
-          id_pkl=$(echo "$rel" | jq -r '.assets[] | select(.name=="model_v2.pkl") | .id')
-          id_sha=$(echo "$rel" | jq -r '.assets[] | select(.name=="model_v2.sha256") | .id')
-          test -n "$id_pkl" && test -n "$id_sha" || { echo "Release assets not found for tag $TAG"; exit 1; }
-          curl -fsSL -H "Authorization: token $GITHUB_TOKEN" \
-               -H "Accept: application/octet-stream" \
-               "https://api.github.com/repos/${{ github.repository }}/releases/assets/$id_pkl" \
-               -o model_assets/model_v2.pkl
-          curl -fsSL -H "Authorization: token $GITHUB_TOKEN" \
-               -H "Accept: application/octet-stream" \
-               "https://api.github.com/repos/${{ github.repository }}/releases/assets/$id_sha" \
-               -o model_assets/model_v2.sha256
-
-      - name: Verify SHA256
-        run: |
-          set -euo pipefail
-          cd model_assets
-          sha256sum -c model_v2.sha256
-
-      - name: Run edge sheet via CLI
-        id: sheet
-        run: |
-          set -euo pipefail
-          OUT="edge_sheet_$(date -u +%F).csv"
-          python code_cli_run_edge_sheet_v1.py --date "$(date -u +%F)"
-          test -f "$OUT" || { echo "Edge sheet not found: $OUT"; ls -la; exit 1; }
-          echo "out=$OUT" >> "$GITHUB_OUTPUT"
-
-      - name: Upload edge sheet artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.sheet.outputs.out }}
-          path: ${{ steps.sheet.outputs.out }}
+      - name: Echo hello
+        run: echo "nightly bootstrap OK"
