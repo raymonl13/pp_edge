@@ -1,51 +1,77 @@
-# .github/workflows/nightly_edge_sheet.yml
 name: nightly_edge_sheet
-
-on:
+true:
   schedule:
-    - cron: '0 8 * * *'   # 08:00 UTC daily
-  workflow_dispatch:
-
+  - cron: 0 8 * * *
+  workflow_dispatch: null
 jobs:
   edge-sheet:
     runs-on: ubuntu-latest
     env:
-      PP_EDGE_TEST_MODE: ""    # ensure test-mode shims never affect nightly
-
+      PP_EDGE_TEST_MODE: ''
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.9'
+    - name: Install dependencies
+      run: 'set -euo pipefail
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.9'
+        python -m pip install --upgrade pip
 
-      - name: Install dependencies
-        run: |
-          set -euo pipefail
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+        pip install -r requirements.txt
 
-      - name: Download model artefacts from GitHub Release (auth)
+        '
+    - name: Download model artefacts from GitHub Release (auth)
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        TAG: v0.11.0-rc1
+      run: 'set -euo pipefail
 
+        mkdir -p model_assets
 
-      - name: Verify SHA256
-        run: |
-          set -euo pipefail
-          cd model_assets
-          sha256sum -c model_v2.sha256
+        which gh >/dev/null 2>&1 || { echo ''gh not found''; exit 1; }
 
-      - name: Run edge sheet via CLI
-        id: sheet
-        run: |
-          set -euo pipefail
-          OUT="edge_sheet_$(date -u +%F).csv"
-          python code_cli_run_edge_sheet_v1.py --date "$(date -u +%F)"
-          test -f "$OUT" || { echo "Edge sheet not found: $OUT"; ls -la; exit 1; }
-          echo "out=$OUT" >> "$GITHUB_OUTPUT"
+        which jq >/dev/null 2>&1 || { echo ''jq not found''; exit 1; }
 
-      - name: Upload edge sheet artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.sheet.outputs.out }}
-          path: ${{ steps.sheet.outputs.out }}
+        rel=$(gh api "repos/${{ github.repository }}/releases/tags/$TAG")
 
+        id_pkl=$(echo "$rel" | jq -r ''.assets[] | select(.name=="model_v2.pkl") |
+        .id'')
+
+        id_sha=$(echo "$rel" | jq -r ''.assets[] | select(.name=="model_v2.sha256")
+        | .id'')
+
+        test -n "$id_pkl" && test -n "$id_sha" || { echo "Release assets not found
+        for tag $TAG"; exit 1; }
+
+        gh api -H "Accept: application/octet-stream" "repos/${{ github.repository
+        }}/releases/assets/$id_pkl" > model_assets/model_v2.pkl
+
+        gh api -H "Accept: application/octet-stream" "repos/${{ github.repository
+        }}/releases/assets/$id_sha" > model_assets/model_v2.sha256'
+    - name: Verify SHA256
+      run: 'set -euo pipefail
+
+        cd model_assets
+
+        sha256sum -c model_v2.sha256
+
+        '
+    - name: Run edge sheet via CLI
+      id: sheet
+      run: 'set -euo pipefail
+
+        OUT="edge_sheet_$(date -u +%F).csv"
+
+        python code_cli_run_edge_sheet_v1.py --date "$(date -u +%F)"
+
+        test -f "$OUT" || { echo "Edge sheet not found: $OUT"; ls -la; exit 1; }
+
+        echo "out=$OUT" >> "$GITHUB_OUTPUT"
+
+        '
+    - name: Upload edge sheet artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.sheet.outputs.out }}
+        path: ${{ steps.sheet.outputs.out }}
