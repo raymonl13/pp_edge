@@ -1,4 +1,4 @@
-name: manual_edge_sheet_e2e.yml
+name: manual_edge_sheet_e2e_v3.yml
 on:
   workflow_dispatch:
     inputs:
