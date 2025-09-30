@@ -62,6 +62,10 @@ jobs:
             mv -f resp.json "data/pricefix_${DAY}.json"
           fi
 
+      - name: Emit CSV from board
+        shell: bash
+        run: |
+          python3 scripts/emit_csv_from_board.py "data/pricefix_${DAY}.json" "edge_sheet_${DAY}.csv" || true
       - name: Run edge-sheet (non-fatal)
         env:
           PYTHONPATH: .
