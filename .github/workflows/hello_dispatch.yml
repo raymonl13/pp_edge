@@ -9,27 +9,45 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo OK
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
       - name: Probe provider (status & count)
         shell: bash
         run: |
+          set -e
           URL="https://api.prizepicks.com/projections?per_page=500"
-          CODE=$(curl -s -H 'Origin: https://prizepicks.com' -H 'Accept: application/json' -A 'Mozilla/5.0' -o resp.json -w "%{http_code}" "$URL")
+          echo "Curling: $URL"
+          CODE=$(curl -s \
+            -H 'Origin: https://prizepicks.com' \
+            -H 'Accept: application/json' \
+            -H 'Accept-Language: en-US,en;q=0.9' \
+            -A 'Mozilla/5.0' \
+            -o resp.json -w "%{http_code}" "$URL")
           echo "HTTP_STATUS=$CODE" > probe_meta.txt
-          python - <<'PY'
-import json
+          echo "RESP_HEAD=$(head -c 200 resp.json | tr '\n' ' ')" >> probe_meta.txt
+          python3 - <<'PY'
+import json, sys
 try:
   j=json.load(open("resp.json"))
-  items = j.get("projections",{}).get("data",[]) if isinstance(j,dict) else (j if isinstance(j,list) else [])
+  if isinstance(j, dict):
+    items = j.get("projections",{}).get("data",[]) or j.get("data") or j.get("results") or j.get("items") or []
+  elif isinstance(j, list):
+    items = j
+  else:
+    items = []
+  print(f"COUNT {len(items)}")
   open("probe_meta.txt","a").write(f"\nCOUNT={len(items)}\n")
-except Exception:
+except Exception as e:
+  print("COUNT 0", e)
   open("probe_meta.txt","a").write("\nCOUNT=0\n")
 PY
       - name: Upload probe artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: provider_probe
           path: |
             resp.json
             probe_meta.txt
-
-# reindex 2025-09-30T16:44:14Z
