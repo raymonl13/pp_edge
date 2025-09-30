@@ -1,3 +1,4 @@
+import subprocess, os, sys
 #!/usr/bin/env python3
 import argparse, datetime, json, os, yaml, pandas as pd, joblib
 from code_core_pp_edge_core_v6_7_v6 import run_pipeline
@@ -20,6 +21,17 @@ def main():
     out   = f"edge_sheet_{tgt}.csv"
     pd.DataFrame(slips).to_csv(out, index=False)
     print(f"edge sheet written → {out} rows:{len(slips)}")
+
+
+def _fallback_emit(day):
+    out_csv=f"edge_sheet_{day}.csv"
+    try:
+        sz=os.path.getsize(out_csv)
+    except Exception:
+        sz=0
+    if sz <= len("player,game_id,p_hit,edge_pp,tier,slip_type\n"):
+        subprocess.run(["python3","scripts/emit_csv_from_board.py",
+                        f"data/pricefix_{day}.json", out_csv], check=False)
 
 if __name__ == "__main__":
     import sys
