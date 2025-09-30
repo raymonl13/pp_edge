@@ -1,7 +1,7 @@
-name: nightly_edge_sheet
+name: nightly_edge_sheet_v2
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
   schedule:
     - cron: '0 8 * * *'
 
@@ -45,89 +45,61 @@ jobs:
                "https://api.github.com/repos/${{ github.repository }}/releases/assets/$id_sha" \
                -o model_assets/model_v2.sha256
 
-      - name: Verify SHA256
+      - name: Verify SHA256 (robust)
         run: |
           set -euo pipefail
           cd model_assets
           if grep -q ' ' model_v2.sha256; then
-            # checksum file has 'HASH  filename' format
             sha256sum -c model_v2.sha256
           else
-            # checksum file has only the hash; synthesize the expected line
             LINE=$(tr -d '\r\n' < model_v2.sha256)
             echo "$LINE  model_v2.pkl" | sha256sum -c -
           fi
 
       - name: Run edge sheet via offline CLI
-
         id: sheet
-
         run: |
-
           set -euo pipefail
-
           RUN_DATE="$(date -u +%F)"
-
           OUT="edge_sheet_${RUN_DATE}.csv"
 
           cat > fixtures_slate.csv <<'CSV'
-
-      player,game_id,p_hit,edge_pp,tag
-
-      A,g1,0.61,0.12,
-
-      B,g2,0.58,0.09,
-
-      C,g3,0.63,0.13,
-
-      D,g4,0.57,0.08,
-
-      E,g5,0.60,0.11,Demon
-
-      F,g6,0.55,0.07,
-
-      CSV
+player,game_id,p_hit,edge_pp,tag
+A,g1,0.61,0.12,
+B,g2,0.58,0.09,
+C,g3,0.63,0.13,
+D,g4,0.57,0.08,
+E,g5,0.60,0.11,Demon
+F,g6,0.55,0.07,
+CSV
 
           python cli/run_offline.py fixtures_slate.csv out/slips.json --cfg config_pp_edge_v6.8.yaml
 
           python - <<'PY2'
-
-      import os, json, pandas as pd
-
-      out = os.environ["OUT"]
-
-      j = json.load(open("out/slips.json"))
-
-      rows=[]
-
-      for s in j.get("slips", []):
-
-          for l in s.get("legs", []):
-
-              rows.append({
-
-                "player": l.get("player"),
-
-                "game_id": l.get("game_id"),
-
-                "p_hit": l.get("p_hit"),
-
-                "edge_pp": l.get("edge_pp"),
-
-                "tier": l.get("tier") or l.get("tag"),
-
-                "slip_type": s.get("slip_type"),
-
-                "stake_total": s.get("stake_total")
-
-              })
-
-      pd.DataFrame(rows).to_csv(out, index=False)
-
-      print("wrote", out)
-
-      PY2
+import os, json, pandas as pd
+out = os.environ["OUT"]
+j = json.load(open("out/slips.json"))
+rows=[]
+for s in j.get("slips", []):
+    for l in s.get("legs", []):
+        rows.append({
+          "player": l.get("player"),
+          "game_id": l.get("game_id"),
+          "p_hit": l.get("p_hit"),
+          "edge_pp": l.get("edge_pp"),
+          "tier": l.get("tier") or l.get("tag"),
+          "slip_type": s.get("slip_type"),
+          "stake_total": s.get("stake_total")
+        })
+pd.DataFrame(rows).to_csv(out, index=False)
+print("wrote", out)
+PY2
 
           test -f "$OUT" || { echo "Edge sheet not found: $OUT"; ls -la; exit 1; }
-
           echo "out=$OUT" >> "$GITHUB_OUTPUT"
+
+      - name: Upload edge sheet artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.sheet.outputs.out }}
+          path: ${{ steps.sheet.outputs.out }}
