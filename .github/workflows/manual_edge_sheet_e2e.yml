@@ -58,12 +58,6 @@ jobs:
           # python code_data_ingest_pricefix_v1.py --date "$DAY" --out "data/pricefix_${DAY}.json" || true
           python code_data_ingest_pricefix_v1.py --date "$DAY" || true
           if [ ! -s "data/pricefix_${DAY}.json" ]; then
-            # If ingest wrote elsewhere, normalize first match into the expected path
-            CAND=$(ls -1 **/*.json 2>/dev/null | head -n1 || true)
-            if [ -n "$CAND" ]; then cp "$CAND" "data/pricefix_${DAY}.json"; fi
-          fi
-          if [ ! -s "data/pricefix_${DAY}.json" ]; then
-            # Last-resort: fetch directly via probe so we don't end up with []
             python3 scripts/probe_pp.py
             mv -f resp.json "data/pricefix_${DAY}.json"
           fi
