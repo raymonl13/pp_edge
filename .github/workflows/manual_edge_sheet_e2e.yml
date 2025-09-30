@@ -1,2 +1,92 @@
+name: manual_edge_sheet_e2e.yml
+on:
+  workflow_dispatch:
+    inputs:
+      day:
+        description: "YYYY-MM-DD; blank = today UTC"
+        required: false
+        type: string
+  push:
+    paths:
+      - .github/workflows/manual_edge_sheet_e2e.yml
+      - code_data_ingest_pricefix_v1.py
+      - code_cli_run_edge_sheet_v1.py
 
-# trigger manual 2025-09-30T19:15:48Z
+jobs:
+  edge_sheet:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare date
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.day }}" ]; then
+            DAY="${{ github.event.inputs.day }}"
+          else
+            DAY="$(date -u +%F)"
+          fi
+          echo "DAY=$DAY" >> "$GITHUB_ENV"
+          echo "Using DAY=$DAY"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: Install deps
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml requests pandas joblib
+
+      - name: Prep dirs
+        shell: bash
+        run: mkdir -p data
+
+      - name: Fetch board (non-fatal)
+        shell: bash
+        run: |
+          python code_data_ingest_pricefix_v1.py --date "$DAY" || true
+          if [ ! -s "data/pricefix_${DAY}.json" ]; then
+            echo "[]" > "data/pricefix_${DAY}.json"
+          fi
+
+      - name: Run edge-sheet
+        env:
+          PYTHONPATH: .
+        shell: bash
+        run: |
+          python code_cli_run_edge_sheet_v1.py --date "$DAY" || true
+
+      - name: Ensure CSV exists
+        shell: bash
+        run: |
+          if [ ! -f "edge_sheet_${DAY}.csv" ]; then
+            printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
+          fi
+
+      - name: Run meta
+        shell: bash
+        run: |
+          rows=$(wc -l < "edge_sheet_${DAY}.csv" 2>/dev/null || echo 0)
+          rows=$((rows>0 ? rows-1 : 0))
+          state=$([ "$rows" -gt 0 ] && echo REAL || echo PLACEHOLDER)
+          printf "DAY=%s\nINGEST_STATE=%s\nCSV_STATE=%s\nCSV_ROWS=%s\n" \
+                 "$DAY" "UNKNOWN" "$state" "$rows" > run_meta.txt
+
+      - name: Upload artifacts (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: edge_sheet_${{ env.DAY }}
+          path: |
+            data/pricefix_${{ env.DAY }}.json
+            edge_sheet_${{ env.DAY }}.csv
+            run_meta.txt
+          if-no-files-found: warn
