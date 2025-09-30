@@ -1,11 +1,8 @@
-name: manual_edge_sheet_e2e.yml
+name: nightly_edge_sheet_e2e.yml
 on:
-  workflow_dispatch:
-    inputs:
-      day:
-        description: "YYYY-MM-DD; blank = tomorrow UTC"
-        required: false
-        type: string
+  schedule:
+    - cron: "0 8 * * *"
+  workflow_dispatch: {}
 jobs:
   edge_sheet:
     runs-on: ubuntu-latest
@@ -22,11 +19,7 @@ jobs:
       - name: Prepare date
         shell: bash
         run: |
-          if [ -n "${{ github.event.inputs.day }}" ]; then
-            DAY="${{ github.event.inputs.day }}"
-          else
-            DAY="$(date -u -d 'tomorrow' +%F)"
-          fi
+          DAY="$(date -u -d 'tomorrow' +%F)"
           echo "DAY=$DAY" >> "$GITHUB_ENV"
           echo "Using DAY=$DAY"
       - name: Setup Python
@@ -118,7 +111,7 @@ jobs:
             cfg="missing"
           fi
           printf "DAY=%s\nMODEL_STATE=%s\nINGEST_STATE=%s\nCSV_STATE=%s\nCSV_ROWS=%s\nCFG=%s\n" "$DAY" "${MODEL_STATE:-UNKNOWN}" "${INGEST_STATE:-UNKNOWN}" "$CSV_STATE" "$rows" "$cfg" > run_meta.txt
-          echo "manual e2e OK"
+          echo "nightly e2e OK"
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
