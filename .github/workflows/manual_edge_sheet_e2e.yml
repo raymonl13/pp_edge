@@ -123,7 +123,7 @@ jobs:
           else
             CSV_STATE="PLACEHOLDER"
           fi
-          if [ -f config_pp_edge_v6.8.yaml ]; then
+          if [ -f config_pp_edge_v6.8.yaml ] ; then
             cfg=$(sha256sum config_pp_edge_v6.8.yaml | cut -c1-8)
           else
             cfg="missing"
