@@ -55,8 +55,8 @@ jobs:
         run: |
           set -e
           # Try ingest; if your script supports --out, uncomment next line:
-          # python code_data_ingest_pricefix_v1.py --date "$DAY" --out "data/pricefix_${DAY}.json" || true
-          python code_data_ingest_pricefix_v1.py --date "$DAY" || true
+          # python code_data_ingest_pricefix_v1.py --date "$DAY" ${PP_LEAGUE_ID:+--league "$PP_LEAGUE_ID"} --out "data/pricefix_${DAY}.json" || true
+          python code_data_ingest_pricefix_v1.py --date "$DAY" ${PP_LEAGUE_ID:+--league "$PP_LEAGUE_ID"} || true
           if [ ! -s "data/pricefix_${DAY}.json" ]; then
             python3 scripts/probe_pp.py
             mv -f resp.json "data/pricefix_${DAY}.json"
