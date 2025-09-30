@@ -1,0 +1,49 @@
+name: manual_edge_sheet_e2e_v4.yaml
+on:
+  workflow_dispatch:
+    inputs:
+      day:
+        description: "YYYY-MM-DD; blank = tomorrow UTC"
+        required: false
+        type: string
+  push:
+    paths:
+      - .github/workflows/manual_edge_sheet_e2e_v4.yaml
+jobs:
+  edge_sheet:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Prepare date
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.day }}" ]; then
+            DAY="${{ github.event.inputs.day }}"
+          else
+            DAY="$(date -u -d 'tomorrow' +%F || date -u -v+1d +%F)"
+          fi
+          echo "DAY=$DAY" >> "$GITHUB_ENV"
+      - name: Probe provider (status & count)
+        shell: bash
+        run: |
+          URL="https://api.prizepicks.com/projections"
+          CODE=$(curl -s -H 'Origin: https://prizepicks.com' -H 'Accept: application/json' -A 'Mozilla/5.0' -o resp.json -w "%{http_code}" "$URL")
+          echo "HTTP_STATUS=$CODE" > probe_meta.txt
+          python - <<'PY2'
+import json
+try:
+  j=json.load(open("resp.json"))
+  count = len(j.get("projections",{}).get("data",[])) if isinstance(j,dict) else (len(j) if isinstance(j,list) else 0)
+except Exception:
+  count = 0
+open("probe_meta.txt","a").write(f"\nCOUNT={count}\n")
+PY2
+      - name: Upload probe artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: provider_probe
+          path: |
+            resp.json
+            probe_meta.txt
+          if-no-files-found: warn
