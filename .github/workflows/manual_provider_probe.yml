@@ -1,0 +1,27 @@
+name: manual_provider_probe.yml
+on:
+  workflow_dispatch: {}
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Curl projections
+        shell: bash
+        run: |
+          URL="https://api.prizepicks.com/projections"
+          CODE=$(curl -s -o resp.json -w "%{http_code}" "$URL")
+          echo "HTTP_STATUS=$CODE" > probe_meta.txt
+          python - <<'PY'
+import json
+j=json.load(open("resp.json"))
+count = len(j.get("projections",{}).get("data",[])) if isinstance(j,dict) else (len(j) if isinstance(j,list) else 0)
+open("probe_meta.txt","a").write(f"\nCOUNT={count}\n")
+PY
+      - name: Upload probe artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: provider_probe
+          path: |
+            resp.json
+            probe_meta.txt
+          if-no-files-found: warn
