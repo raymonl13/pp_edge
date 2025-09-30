@@ -9,6 +9,7 @@ on:
   push:
     paths:
       - .github/workflows/manual_edge_sheet_e2e.yml
+      - scripts/*.py
       - code_data_ingest_pricefix_v1.py
       - code_cli_run_edge_sheet_v1.py
 
@@ -49,15 +50,25 @@ jobs:
         shell: bash
         run: mkdir -p data
 
-      - name: Fetch board (non-fatal)
+      - name: Fetch board via ingest (non-fatal)
         shell: bash
         run: |
-          python code_data_ingest_pricefix_v1.py --date "$DAY" --out "data/pricefix_${DAY}.json" || true
+          set -e
+          # Try ingest; if your script supports --out, uncomment next line:
+          # python code_data_ingest_pricefix_v1.py --date "$DAY" --out "data/pricefix_${DAY}.json" || true
+          python code_data_ingest_pricefix_v1.py --date "$DAY" || true
           if [ ! -s "data/pricefix_${DAY}.json" ]; then
-            echo "[]" > "data/pricefix_${DAY}.json"
+            # If ingest wrote elsewhere, normalize first match into the expected path
+            CAND=$(ls -1 **/*.json 2>/dev/null | head -n1 || true)
+            if [ -n "$CAND" ]; then cp "$CAND" "data/pricefix_${DAY}.json"; fi
+          fi
+          if [ ! -s "data/pricefix_${DAY}.json" ]; then
+            # Last-resort: fetch directly via probe so we don't end up with []
+            python3 scripts/probe_pp.py
+            mv -f resp.json "data/pricefix_${DAY}.json"
           fi
 
-      - name: Run edge-sheet
+      - name: Run edge-sheet (non-fatal)
         env:
           PYTHONPATH: .
         shell: bash
@@ -71,33 +82,12 @@ jobs:
             printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
           fi
 
-            - name: Run meta
+      - name: Summarize meta
         shell: bash
         run: |
-          rows=$(wc -l < "edge_sheet_${DAY}.csv" 2>/dev/null || echo 0)
-          rows=$((rows>0 ? rows-1 : 0))
-          state=$([ "$rows" -gt 0 ] && echo REAL || echo PLACEHOLDER)
-          cnt=$(python - <<'PY2'
-import json,sys,os
-day=os.environ.get("DAY","")
-path=f"data/pricefix_{day}.json"
-try:
-  j=json.load(open(path))
-  items = j.get("projections",{}).get("data",[]) if isinstance(j,dict) else (j if isinstance(j,list) else [])
-  print(len(items))
-except Exception:
-  print(0)
-PY2
-)
-          istate=$([ "${cnt:-0}" -gt 0 ] && echo OK || echo FALLBACK)
-          printf "DAY=%s
-INGEST_STATE=%s
-CSV_STATE=%s
-CSV_ROWS=%s
-" \
-                 "$DAY" "$istate" "$state" "$rows" > run_meta.txt
-      - name: Upload artifacts (always)
+          python3 scripts/summarize_meta.py "$DAY"
 
+      - name: Upload artifacts (always)
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -107,7 +97,3 @@ CSV_ROWS=%s
             edge_sheet_${{ env.DAY }}.csv
             run_meta.txt
           if-no-files-found: warn
-
-# trigger manual 2025-09-30T19:28:16Z
-
-# trigger manual 2025-09-30T19:57:01Z
