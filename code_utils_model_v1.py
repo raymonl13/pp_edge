@@ -11,7 +11,10 @@ from features import (
     rolling_woba, barrel_pct, pitcher_swstr,
     park_factor, wind_adj, travel_miles, platoon_split
 )
-from xgboost import XGBClassifier
+try:
+    from xgboost import XGBClassifier
+except Exception:
+    XGBClassifier = None
 from sklearn.model_selection import RandomizedSearchCV
 
 FEATURE_ORDER = [
