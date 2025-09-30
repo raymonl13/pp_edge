@@ -14,6 +14,7 @@ jobs:
       actions: read
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PP_EDGE_TEST_MODE: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -83,6 +84,15 @@ jobs:
         run: |
           if [ ! -f "edge_sheet_${DAY}.csv" ]; then
             printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
+          fi
+      - name: Inject synthetic row (test mode)
+        if: env.PP_EDGE_TEST_MODE == '1'
+        shell: bash
+        run: |
+          lines=$(wc -l < "edge_sheet_${DAY}.csv" || echo 0)
+          if [ "$lines" -le 1 ]; then
+            printf "Sample Player,EX123,0.60,0.10,Standard,2-leg\n" >> "edge_sheet_${DAY}.csv"
+            echo "Injected synthetic row"
           fi
       - name: Run meta
         shell: bash
