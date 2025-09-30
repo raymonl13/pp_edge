@@ -1,0 +1,9 @@
+name: manual_edge_sheet_reg.yml
+on:
+  workflow_dispatch: {}
+jobs:
+  reg:
+    runs-on: ubuntu-latest
+    steps:
+      - name: ping
+        run: echo "reg OK"
