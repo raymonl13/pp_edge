@@ -36,3 +36,9 @@ dashboard_v3/dist/
 
 
 !fixtures/
+
+# allow GitHub Actions workflows
+!.github/
+!.github/workflows/
+!.github/workflows/*.yml
+!.github/workflows/*.yaml
