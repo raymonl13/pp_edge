@@ -1,4 +1,4 @@
-name: .github/workflows/manual_edge_sheet_v3.yml
+name: .github/workflows/manual_edge_sheet_v3_v4.yml
 on:
   workflow_dispatch:
     inputs:
