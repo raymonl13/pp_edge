@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - .github/workflows/hello_dispatch.yml
+      - scripts/probe_pp.py
 jobs:
   probe:
     runs-on: ubuntu-latest
@@ -11,43 +12,18 @@ jobs:
       contents: read
       actions: write
     steps:
-      - run: echo OK
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-      - name: Probe provider (status + evidence)
+      - name: Run probe
         shell: bash
-        continue-on-error: true
         run: |
           set -eu
-          URL="https://api.prizepicks.com/projections?per_page=500"
-          : > probe_meta.txt
-          echo "{}" > resp.json
-          CODE=$(curl -sSv "$URL" \
-            -H 'Origin: https://prizepicks.com' \
-            -H 'Accept: application/json' \
-            -H 'Accept-Language: en-US,en;q=0.9' \
-            -H 'Referer: https://prizepicks.com/' \
-            -A 'Mozilla/5.0' \
-            -o resp.json -w "%{http_code}" 2>curl_trace.txt || true)
-          echo "HTTP_STATUS=$CODE" >> probe_meta.txt
-          python3 - <<'PY' || true
-import json
-try:
-  j=json.load(open("resp.json"))
-  if isinstance(j, dict):
-    items = j.get("projections",{}).get("data",[]) or j.get("data") or j.get("results") or j.get("items") or []
-  elif isinstance(j, list):
-    items = j
-  else:
-    items = []
-  open("probe_meta.txt","a").write(f"COUNT={len(items)}\n")
-except Exception:
-  open("probe_meta.txt","a").write("COUNT=0\n")
-PY
-          head -c 200 resp.json | tr '\n' ' ' > body_head.txt || true
-          ls -l probe_meta.txt resp.json curl_trace.txt body_head.txt || true
+          python3 scripts/probe_pp.py || true
+          ls -l probe_meta.txt resp.json body_head.txt || true
       - name: Upload probe artifacts (always)
         if: always()
         uses: actions/upload-artifact@v4
@@ -55,9 +31,6 @@ PY
           name: provider_probe
           path: |
             probe_meta.txt
-            curl_trace.txt
             resp.json
             body_head.txt
           if-no-files-found: warn
-
-# trigger 2025-09-30T18:56:27Z
