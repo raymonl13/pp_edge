@@ -68,6 +68,17 @@ jobs:
             echo "[]" > "data/pricefix_${DAY}.json"
             echo "INGEST_STATE=FALLBACK" >> "$GITHUB_ENV"
           fi
+      - name: Inspect/normalize data dir
+        shell: bash
+        run: |
+          echo "::group::data dir"; ls -lAh data || true; echo "::endgroup::"
+          if [ ! -s "data/pricefix_${DAY}.json" ]; then
+            CAND=$(ls -1 data/*.json 2>/dev/null | head -n1 || true)
+            if [ -n "$CAND" ]; then
+              cp "$CAND" "data/pricefix_${DAY}.json"
+              echo "Normalized board from $CAND"
+            fi
+          fi
       - name: Upload raw board
         uses: actions/upload-artifact@v4
         with:
