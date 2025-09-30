@@ -52,7 +52,7 @@ jobs:
       - name: Fetch board (non-fatal)
         shell: bash
         run: |
-          python code_data_ingest_pricefix_v1.py --date "$DAY" || true
+          python code_data_ingest_pricefix_v1.py --date "$DAY" --out "data/pricefix_${DAY}.json" || true
           if [ ! -s "data/pricefix_${DAY}.json" ]; then
             echo "[]" > "data/pricefix_${DAY}.json"
           fi
@@ -71,16 +71,33 @@ jobs:
             printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
           fi
 
-      - name: Run meta
+            - name: Run meta
         shell: bash
         run: |
           rows=$(wc -l < "edge_sheet_${DAY}.csv" 2>/dev/null || echo 0)
           rows=$((rows>0 ? rows-1 : 0))
           state=$([ "$rows" -gt 0 ] && echo REAL || echo PLACEHOLDER)
-          printf "DAY=%s\nINGEST_STATE=%s\nCSV_STATE=%s\nCSV_ROWS=%s\n" \
-                 "$DAY" "UNKNOWN" "$state" "$rows" > run_meta.txt
-
+          cnt=$(python - <<'PY2'
+import json,sys,os
+day=os.environ.get("DAY","")
+path=f"data/pricefix_{day}.json"
+try:
+  j=json.load(open(path))
+  items = j.get("projections",{}).get("data",[]) if isinstance(j,dict) else (j if isinstance(j,list) else [])
+  print(len(items))
+except Exception:
+  print(0)
+PY2
+)
+          istate=$([ "${cnt:-0}" -gt 0 ] && echo OK || echo FALLBACK)
+          printf "DAY=%s
+INGEST_STATE=%s
+CSV_STATE=%s
+CSV_ROWS=%s
+" \
+                 "$DAY" "$istate" "$state" "$rows" > run_meta.txt
       - name: Upload artifacts (always)
+
         if: always()
         uses: actions/upload-artifact@v4
         with:
