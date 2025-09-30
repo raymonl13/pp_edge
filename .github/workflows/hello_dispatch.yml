@@ -1,5 +1,9 @@
 name: hello_dispatch.yml
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/hello_dispatch.yml
 jobs:
   ping:
     runs-on: ubuntu-latest
@@ -16,10 +20,9 @@ import json
 try:
   j=json.load(open("resp.json"))
   items = j.get("projections",{}).get("data",[]) if isinstance(j,dict) else (j if isinstance(j,list) else [])
-  print("COUNT", len(items))
   open("probe_meta.txt","a").write(f"\nCOUNT={len(items)}\n")
 except Exception:
-  print("COUNT 0"); open("probe_meta.txt","a").write("\nCOUNT=0\n")
+  open("probe_meta.txt","a").write("\nCOUNT=0\n")
 PY
       - name: Upload probe artifacts
         uses: actions/upload-artifact@v4
