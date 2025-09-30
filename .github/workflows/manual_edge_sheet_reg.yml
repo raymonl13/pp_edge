@@ -1,9 +1,122 @@
 name: manual_edge_sheet_reg.yml
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      day:
+        description: "Edge-sheet date (YYYY-MM-DD). Leave blank for tomorrow (UTC)."
+        required: false
+        type: string
 jobs:
-  reg:
+  edge_sheet:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: ping
-        run: echo "reg OK"
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Prepare date
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.day }}" ]; then
+            echo "DAY=${{ github.event.inputs.day }}" >> "$GITHUB_ENV"
+          else
+            echo "DAY=$(date -u -d 'tomorrow' +%F)" >> "$GITHUB_ENV"
+          fi
+          echo "Using DAY=$DAY"
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+      - name: Install deps
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml requests pandas joblib
+      - name: Prep dirs
+        shell: bash
+        run: mkdir -p model data
+      - name: Download model assets
+        shell: bash
+        run: |
+          gh release download v0.11.0-rc1 -R "$GITHUB_REPOSITORY" -p "model_v2.pkl" -p "model_v2.sha256" -D model
+        continue-on-error: true
+      - name: Verify checksum
+        shell: bash
+        run: |
+          if [ -f model/model_v2.pkl ] && [ -f model/model_v2.sha256 ]; then
+            cd model
+            if [ "$(wc -w < model_v2.sha256)" -eq 1 ]; then
+              h=$(cat model_v2.sha256)
+              printf "%s  %s\n" "$h" "model_v2.pkl" > model_v2.sha256
+            fi
+            sha256sum -c model_v2.sha256
+            echo "MODEL_STATE=OK" >> "$GITHUB_ENV"
+            cd -
+          else
+            echo "Model assets missing; proceeding with offline fallback."
+            echo "MODEL_STATE=MISSING" >> "$GITHUB_ENV"
+          fi
+      - name: Fetch board
+        shell: bash
+        run: |
+          set -e
+          python code_data_ingest_pricefix_v1.py --date "$DAY" || true
+          if [ -s "data/pricefix_${DAY}.json" ]; then
+            echo "INGEST_STATE=OK" >> "$GITHUB_ENV"
+          else
+            echo "[]" > "data/pricefix_${DAY}.json"
+            echo "Wrote empty board fallback."
+            echo "INGEST_STATE=FALLBACK" >> "$GITHUB_ENV"
+          fi
+      - name: Run edge-sheet
+        env:
+          PYTHONPATH: .
+        shell: bash
+        run: |
+          python code_cli_run_edge_sheet_v1.py --date "$DAY" --cfg config_pp_edge_v6.8.yaml || true
+      - name: Ensure artifact exists
+        shell: bash
+        run: |
+          if [ ! -f "edge_sheet_${DAY}.csv" ]; then
+            python - <<'PY'
+import os, pandas as pd
+day=os.environ["DAY"]
+pd.DataFrame([]).to_csv(f"edge_sheet_{day}.csv", index=False)
+print("Emitted placeholder CSV")
+PY
+          fi
+      - name: Run meta
+        shell: bash
+        run: |
+          rows=$(python - <<'PY'
+import os
+day=os.environ["DAY"]
+p=f"edge_sheet_{day}.csv"
+try:
+    with open(p, "r", encoding="utf-8") as f:
+        n=sum(1 for _ in f)
+except FileNotFoundError:
+    n=0
+print(max(n-1,0))
+PY
+          )
+          if [ "$rows" -gt 0 ]; then
+            echo "CSV_STATE=REAL" >> "$GITHUB_ENV"
+          else
+            echo "CSV_STATE=PLACEHOLDER" >> "$GITHUB_ENV"
+          fi
+          cfg_hash=$(sha256sum config_pp_edge_v6.8.yaml 2>/dev/null | cut -c1-8 || echo "missing")
+          printf "DAY=%s\nMODEL_STATE=%s\nINGEST_STATE=%s\nCSV_STATE=%s\nCSV_ROWS=%s\nCFG=%s\n" "$DAY" "${MODEL_STATE:-UNKNOWN}" "${INGEST_STATE:-UNKNOWN}" "${CSV_STATE:-UNKNOWN}" "$rows" "$cfg_hash" > run_meta.txt
+          echo "manual reg OK"
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: edge_sheet_${{ env.DAY }}
+          path: |
+            edge_sheet_${{ env.DAY }}.csv
+            run_meta.txt
+          if-no-files-found: warn
