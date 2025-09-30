@@ -15,19 +15,20 @@ jobs:
           python-version: "3.10"
       - name: Probe provider (status & count)
         shell: bash
+        continue-on-error: true
         run: |
-          set -e
+          set -eu
           URL="https://api.prizepicks.com/projections?per_page=500"
-          echo "Curling: $URL"
+          : > probe_meta.txt
+          echo "{}" > resp.json
           CODE=$(curl -s \
             -H 'Origin: https://prizepicks.com' \
             -H 'Accept: application/json' \
             -H 'Accept-Language: en-US,en;q=0.9' \
             -A 'Mozilla/5.0' \
-            -o resp.json -w "%{http_code}" "$URL")
-          echo "HTTP_STATUS=$CODE" > probe_meta.txt
-          echo "RESP_HEAD=$(head -c 200 resp.json | tr '\n' ' ')" >> probe_meta.txt
-          python3 - <<'PY'
+            -o resp.json -w "%{http_code}" "$URL" || true)
+          echo "HTTP_STATUS=$CODE" >> probe_meta.txt
+          python3 - <<'PY' || true
 import json, sys
 try:
   j=json.load(open("resp.json"))
@@ -37,10 +38,8 @@ try:
     items = j
   else:
     items = []
-  print(f"COUNT {len(items)}")
   open("probe_meta.txt","a").write(f"\nCOUNT={len(items)}\n")
 except Exception as e:
-  print("COUNT 0", e)
   open("probe_meta.txt","a").write("\nCOUNT=0\n")
 PY
       - name: Upload probe artifacts
@@ -51,5 +50,4 @@ PY
           path: |
             resp.json
             probe_meta.txt
-
-# reindex 2025-09-30T17:16:02Z
+          if-no-files-found: warn
