@@ -36,7 +36,7 @@ def main():
         {
             "player": o["attributes"]["name"],
             "team":   o["attributes"]["team"],
-            "stat":   o["attributes"]["stat_type"].title(),
+            "stat":   str((o.get("attributes") or {}).get("stat_type") or (o.get("attributes") or {}).get("statType") or (o.get("attributes") or {}).get("stat") or "").title(),
             "line":   float(o["attributes"]["line_score"]),
         }
         for o in data["included"] if o["type"] == "new_player"
