@@ -81,6 +81,31 @@ jobs:
           fi
 
       - name: Summarize meta
+      - name: Install deps (qa_alloc)
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml pandas
+
+      - name: Run QA + Alloc
+        shell: bash
+        env:
+          SLATE_TZ: America/Los_Angeles
+        run: |
+          if [ -n "${DAY:-}" ]; then python3 scripts/run_qa_alloc.py "$DAY" --cfg config_pp_edge_v6.8.yaml --tz "$SLATE_TZ" || true; else python3 scripts/run_qa_alloc.py --cfg config_pp_edge_v6.8.yaml --tz "$SLATE_TZ" || true; fi
+
+      - name: Upload QA/Alloc artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa_alloc_${{ github.run_number }}
+          path: |
+            qa_report.json
+            qa_report.csv
+            alloc_summary.csv
+            run_meta.txt
+          if-no-files-found: warn
+
         shell: bash
         run: |
           python3 scripts/summarize_meta.py "$DAY"
