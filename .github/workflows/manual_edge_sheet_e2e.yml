@@ -85,6 +85,22 @@ jobs:
               cp "$CAND" "data/pricefix_${DAY}.json"
             fi
           fi
+      - name: Probe provider (status & count)
+        shell: bash
+        run: |
+          URL="https://api.prizepicks.com/projections"
+          CODE=$(curl -s -H 'Origin: https://prizepicks.com' -H 'Accept: application/json' -A 'Mozilla/5.0' -o resp.json -w "%{http_code}" "$URL")
+          echo "HTTP_STATUS=$CODE" > probe_meta.txt
+          python - <<'PY2'
+import json
+try:
+  j=json.load(open("resp.json"))
+  count = len(j.get("projections",{}).get("data",[])) if isinstance(j,dict) else (len(j) if isinstance(j,list) else 0)
+except Exception:
+  count = 0
+open("probe_meta.txt","a").write(f"\nCOUNT={count}\n")
+PY2
+
       - name: Upload raw board
         uses: actions/upload-artifact@v4
         with:
