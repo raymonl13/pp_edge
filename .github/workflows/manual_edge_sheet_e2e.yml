@@ -15,14 +15,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
+
       - name: Deps
         run: |
           python -m pip install --upgrade pip
           pip install pyyaml pandas
+
       - name: Resolve DAY
         run: |
           echo "DAY=$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default tomorrow)" >> "$GITHUB_ENV"
           echo "DAY=$DAY"
+
       - name: Ensure config default
         run: |
           if [ ! -f config_pp_edge_v6.8.yaml ]; then
@@ -42,17 +45,21 @@ tiers:
     Standard: 1.0
 CFG
           fi
+
       - name: Fetch board via ingest (non-fatal)
         run: |
           python3 code_data_ingest_pricefix_v1.py --date "$DAY" || true
           mkdir -p data
           test -s "data/pricefix_${DAY}.json" || printf '{}' > "data/pricefix_${DAY}.json"
+
       - name: Emit CSV from board
         run: |
           python3 scripts/emit_csv_from_board.py "data/pricefix_${DAY}.json" "edge_sheet_${DAY}.csv" || true
+
       - name: Ensure CSV exists (guard)
         run: |
           test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
+
       - name: Preflight QA+Alloc
         continue-on-error: true
         run: |
@@ -60,6 +67,7 @@ CFG
           python3 -c "import code_utils_slipqa_v2, code_utils_allocator_v2; print('imports_ok')"
           test -f config_pp_edge_v6.8.yaml && echo "cfg_ok" || echo "cfg_missing"
           ls -l "edge_sheet_${DAY}.csv" || true
+
       - name: QA+Alloc
         run: |
           set -euo pipefail
@@ -67,18 +75,21 @@ CFG
           python3 --version
           python3 scripts/run_qa_alloc.py "$DAY" --cfg config_pp_edge_v6.8.yaml --tz America/Los_Angeles || true
           ls -l qa_report.json qa_report.csv alloc_summary.csv run_meta.txt || true
+
       - name: Fallback meta and CSV
         if: always()
         run: |
           if [ -z "${DAY:-}" ]; then DAY="$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default tomorrow)"; echo "DAY=$DAY" >> "$GITHUB_ENV"; fi
           test -f run_meta.txt || printf "QA_STATE=FAIL ALLOC_STATE=WARN REASON=CANCELLED_OR_EARLY_EXIT\n" > run_meta.txt
           test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
+
       - name: Sanity list before Upload
         if: always()
         run: |
           echo "DAY=${DAY}"
           ls -l edge_sheet_${DAY}.csv || true
           ls -l qa_report.json qa_report.csv alloc_summary.csv run_meta.txt || true
+
       - name: Upload
         if: always()
         uses: actions/upload-artifact@v4
