@@ -23,7 +23,7 @@ def _load_cfg(path: str | Path) -> Dict[str, Any]:
     except Exception:
         return {}
     with p.open() as f:
-        d = yaml.safe_load(f) or {}
+        d = (yaml.safe_load(f) or {})
     return d if isinstance(d, dict) else {}
 
 def _stable_game_id(r: Dict[str, Any], day_iso: str) -> str:
@@ -87,7 +87,7 @@ def _apply_calibration(p_list: List[float], cal_cfg: Dict[str, Any] | None) -> t
 
 def _fallback_prob(rows: List[Dict[str,Any]], fb_cfg: Dict[str,Any] | None) -> List[float]:
     fb_cfg = fb_cfg or {}
-    base = float(fb_cfg.get("p_hit_default", 0.52))
+    base = float(fb_cfg.get("p_hit_default", 0.505))
     stat_map = fb_cfg.get("stat_bias") or {}
     out: List[float] = []
     for r in rows:
@@ -142,7 +142,12 @@ def score_rows(rows: List[Dict[str,Any]], cfg: Dict[str,Any], day_iso: str) -> t
     return out, model_state, cal_state
 
 def _append_meta(model_state: str, cal_state: str, count: int, out_csv: Path) -> None:
-    lines = [f"MODEL_STATE={model_state}", f"CAL_STATE={cal_state}", f"SCORED_ROWS={count}"]
+    lines = [
+        f"MODEL_STATE={model_state}",
+        f"CAL_STATE={cal_state}",
+        f"SCORED_ROWS={count}",
+        f"CSV_ROWS={count}"
+    ]
     for ln in lines: print(ln)
     with open("run_meta.txt","a") as fh: fh.write("\n".join(lines) + "\n")
     print(f"EDGE_SHEET={out_csv}")
