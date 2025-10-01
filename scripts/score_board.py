@@ -124,8 +124,12 @@ def _load_board_with_fallback(day_iso: str) -> tuple[List[Dict[str,Any]], str]:
     if today != day_iso:
         rows2 = _load_board_file(today)
         if rows2: return rows2, "TODAY"
-    synth = [{"player":"SYNTH A","team":"SMK","stat":"PTS","line":0.0},
-             {"player":"SYNTH B","team":"SMK","stat":"REB","line":0.0}]
+    synth = [
+        {"player":"SYNTH A","team":"SMK","stat":"PTS","line":0.0},
+        {"player":"SYNTH B","team":"SMK","stat":"REB","line":0.0},
+        {"player":"SYNTH C","team":"SMK","stat":"AST","line":0.0},
+        {"player":"SYNTH D","team":"SMK","stat":"PRA","line":0.0}
+    ]
     return synth, "SYNTH"
 
 def _clamp_edge(edge: float, source: str) -> float:
