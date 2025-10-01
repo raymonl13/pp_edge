@@ -6,7 +6,7 @@ OUT="artifacts/run_$RUN_ID"
 mkdir -p "$OUT"
 if [ -n "$NAME" ]; then
   gh run download "$RUN_ID" --name "$NAME" --dir "$OUT"
-  echo "$OUT/$NAME"
+  echo "$OUT"
 else
   gh run download "$RUN_ID" --dir "$OUT"
   echo "$OUT"
