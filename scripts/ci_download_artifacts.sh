@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
-RUN_ID="${1:?}"
-OUT="artifacts/run_$RUN_ID"
+RID="${1:?}"
+REPO="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
+OUT="artifacts/run_${RID}"
 mkdir -p "$OUT"
-gh run download "$RUN_ID" --dir "$OUT"
-echo "$OUT"
+NAME="$(gh api repos/$REPO/actions/runs/$RID/artifacts --jq '.artifacts[0].name')"
+gh run download "$RID" --name "$NAME" --dir "$OUT"
+DIR="$OUT/$NAME"
+echo "$DIR"
