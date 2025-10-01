@@ -42,3 +42,7 @@ dashboard_v3/dist/
 !.github/workflows/
 !.github/workflows/*.yml
 !.github/workflows/*.yaml
+# local CI artifacts & logs
+artifacts/
+.ci_watch.log
+.ci_run.log
