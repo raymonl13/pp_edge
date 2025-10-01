@@ -27,6 +27,11 @@ jobs:
           mkdir -p data
           test -s "data/pricefix_${DAY}.json" || printf '{}' > "data/pricefix_${DAY}.json"
       - name: Emit CSV from board
+      - name: Ensure CSV exists (guard)
+        if: always()
+        shell: bash
+        run: |
+          test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
         shell: bash
         run: |
           python3 scripts/emit_csv_from_board.py "data/pricefix_${DAY}.json" "edge_sheet_${DAY}.csv" || true
