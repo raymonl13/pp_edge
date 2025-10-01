@@ -8,12 +8,27 @@ def _iso_day(day: str | None) -> str:
     if day: return day
     return (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
 
+def _extract_rows(obj: Any) -> List[Dict[str, Any]]:
+    if isinstance(obj, list):
+        return [r for r in obj if isinstance(r, dict)]
+    if isinstance(obj, dict):
+        for k in ("rows","data","board","items","entries","legs","players"):
+            v = obj.get(k)
+            if isinstance(v, list):
+                return [r for r in v if isinstance(r, dict)]
+            if isinstance(v, dict):
+                return [r for r in v.values() if isinstance(r, dict)]
+        for v in obj.values():
+            if isinstance(v, list) and v and isinstance(v[0], dict):
+                return v
+    return []
+
 def _load_board(day_iso: str) -> List[Dict[str, Any]]:
     p = Path(f"data/pricefix_{day_iso}.json")
     if not p.exists(): return []
     with p.open() as f:
         data = json.load(f)
-    return data if isinstance(data, list) else []
+    return _extract_rows(data)
 
 def _load_cfg(path: str | Path) -> Dict[str, Any]:
     p = Path(path)
@@ -25,6 +40,25 @@ def _load_cfg(path: str | Path) -> Dict[str, Any]:
     with p.open() as f:
         d = (yaml.safe_load(f) or {})
     return d if isinstance(d, dict) else {}
+
+def _coerce_float(x: Any, default: float = 0.0) -> float:
+    try: return float(x)
+    except Exception: return default
+
+def _norm_row(r: Dict[str, Any]) -> Dict[str, Any]:
+    player = r.get("player") or r.get("name") or r.get("player_name") or r.get("athlete") or r.get("full_name") or "?"
+    stat   = r.get("stat")   or r.get("market") or r.get("category")   or r.get("stat_type") or ""
+    line   = None
+    for k in ("line","line_val","lineValue","projection","prop_line","target"):
+        if k in r:
+            line = r.get(k); break
+    team = r.get("team") or r.get("team_abbr") or r.get("team_name") or ""
+    return {
+        "player": str(player),
+        "team": str(team),
+        "stat": str(stat).upper() if stat else "",
+        "line": _coerce_float(line, 0.0),
+    }
 
 def _stable_game_id(r: Dict[str, Any], day_iso: str) -> str:
     raw = f"{r.get('player','?')}|{r.get('team','?')}|{r.get('stat','?')}|{r.get('line','?')}|{day_iso}"
@@ -76,7 +110,7 @@ def _apply_calibration(p_list: List[float], cal_cfg: Dict[str, Any] | None) -> t
             def interp(x: float) -> float:
                 if x <= xs[0]: return ys[0]
                 if x >= xs[-1]: return ys[-1]
-                j = bisect.bisect_left(xs, x)
+                import bisect as _b; j = _b.bisect_left(xs, x)
                 x0,x1 = xs[j-1], xs[j]; y0,y1 = ys[j-1], ys[j]
                 if x1 == x0: return y0
                 return y0 + (y1 - y0) * ((x - x0) / (x1 - x0))
@@ -100,7 +134,9 @@ def _fallback_prob(rows: List[Dict[str,Any]], fb_cfg: Dict[str,Any] | None) -> L
         out.append(min(0.95, max(0.05, p)))
     return out
 
-def score_rows(rows: List[Dict[str,Any]], cfg: Dict[str,Any], day_iso: str) -> tuple[List[Dict[str,Any]], str, str]:
+def score_rows(raw_rows: List[Dict[str,Any]], cfg: Dict[str,Any], day_iso: str) -> tuple[List[Dict[str,Any]], str, str, int]:
+    rows = [_norm_row(r) for r in raw_rows]
+    board_rows = len(rows)
     payouts = cfg.get("payouts") or {"Power2":3.0,"Power3":5.0,"Power4":10.0,"Power6":25.0,"Flex4":{"4":1.5,"3":0.5},"Flex5":{"5":10.0,"4":2.0}}
     slip_types = list(payouts.keys())
     model_cfg = cfg.get("model") or {}
@@ -133,20 +169,21 @@ def score_rows(rows: List[Dict[str,Any]], cfg: Dict[str,Any], day_iso: str) -> t
     out: List[Dict[str,Any]] = []
     for i, r in enumerate(rows):
         gid = _stable_game_id(r, day_iso)
-        p_hit_i = float(p_cal[i])
+        p_hit_i = float(p_cal[i] if i < len(p_cal) else 0.5)
         for s_type in slip_types:
             pay = _payout_scalar(payouts[s_type])
             edge = round(p_hit_i * pay - 1.0, 4)
             tier = _choose_tier(edge, cfg.get("tiers"))
             out.append({"player": r.get("player"), "game_id": gid, "p_hit": round(p_hit_i, 4), "edge_pp": edge, "tier": tier, "slip_type": s_type})
-    return out, model_state, cal_state
+    return out, model_state, cal_state, board_rows
 
-def _append_meta(model_state: str, cal_state: str, count: int, out_csv: Path) -> None:
+def _append_meta(model_state: str, cal_state: str, count: int, out_csv: Path, board_rows: int) -> None:
     lines = [
         f"MODEL_STATE={model_state}",
         f"CAL_STATE={cal_state}",
         f"SCORED_ROWS={count}",
-        f"CSV_ROWS={count}"
+        f"CSV_ROWS={count}",
+        f"BOARD_ROWS={board_rows}"
     ]
     for ln in lines: print(ln)
     with open("run_meta.txt","a") as fh: fh.write("\n".join(lines) + "\n")
@@ -158,16 +195,16 @@ def main():
     ap.add_argument("--cfg", default="config_pp_edge_v6.8.yaml")
     args = ap.parse_args()
     day = _iso_day(args.day)
-    rows = _load_board(day)
+    raw = _load_board(day)
     cfg  = _load_cfg(args.cfg)
-    recs, mstate, cstate = score_rows(rows, cfg, day)
+    recs, mstate, cstate, bcount = score_rows(raw, cfg, day)
     out = Path(f"edge_sheet_{day}.csv")
     with out.open("w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=["player","game_id","p_hit","edge_pp","tier","slip_type"])
         w.writeheader()
         for r in recs: w.writerow(r)
     print(f"edge sheet written -> {out} rows:{len(recs)}")
-    _append_meta(mstate, cstate, len(recs), out)
+    _append_meta(mstate, cstate, len(recs), out, bcount)
 
 if __name__ == "__main__":
     main()
