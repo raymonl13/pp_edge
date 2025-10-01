@@ -1,6 +1,6 @@
-[main a36e040] ci: trigger qa_alloc 2025-10-01T01:29:53Z
+[main a0c44b3] ci: trigger qa_alloc 2025-10-01T01:39:52Z
 STATUS=completed
-RUN_ID=18148345317
-RUN_URL=https://github.com/raymonl13/pp_edge/actions/runs/18148345317
+RUN_ID=18148459062
+RUN_URL=https://github.com/raymonl13/pp_edge/actions/runs/18148459062
 CONCLUSION=failure
 ARTIFACT_NAMES=
