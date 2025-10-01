@@ -50,15 +50,9 @@ def _norm_row(r: Dict[str, Any]) -> Dict[str, Any]:
     stat   = r.get("stat")   or r.get("market") or r.get("category")   or r.get("stat_type") or ""
     line   = None
     for k in ("line","line_val","lineValue","projection","prop_line","target"):
-        if k in r:
-            line = r.get(k); break
+        if k in r: line = r.get(k); break
     team = r.get("team") or r.get("team_abbr") or r.get("team_name") or ""
-    return {
-        "player": str(player),
-        "team": str(team),
-        "stat": str(stat).upper() if stat else "",
-        "line": _coerce_float(line, 0.0),
-    }
+    return {"player": str(player), "team": str(team), "stat": str(stat).upper() if stat else "", "line": _coerce_float(line, 0.0)}
 
 def _stable_game_id(r: Dict[str, Any], day_iso: str) -> str:
     raw = f"{r.get('player','?')}|{r.get('team','?')}|{r.get('stat','?')}|{r.get('line','?')}|{day_iso}"
@@ -97,25 +91,21 @@ def _apply_calibration(p_list: List[float], cal_cfg: Dict[str, Any] | None) -> t
     if method in ("","none","skip","false","0"): return p_list, "SKIP"
     try:
         if method == "platt":
-            A = float(cal_cfg.get("A", cal_cfg.get("a", 1.0)))
-            B = float(cal_cfg.get("B", cal_cfg.get("b", 0.0)))
-            return [ _inv_logit_scalar(A*_logit_scalar(p) + B) for p in p_list ], "APPLIED"
+            A = float(cal_cfg.get("A", cal_cfg.get("a", 1.0))); B = float(cal_cfg.get("B", cal_cfg.get("b", 0.0)))
+            return [_inv_logit_scalar(A*_logit_scalar(p) + B) for p in p_list], "APPLIED"
         if method == "isotonic":
             pairs = cal_cfg.get("pairs") or []
-            xs = [float(a) for a,_ in pairs]
-            ys = [float(b) for _,b in pairs]
+            xs = [float(a) for a,_ in pairs]; ys = [float(b) for _,b in pairs]
             if len(xs) < 2: return p_list, "CONFIG_EMPTY"
-            order = sorted(range(len(xs)), key=lambda i: xs[i])
-            xs = [xs[i] for i in order]; ys = [ys[i] for i in order]
+            order = sorted(range(len(xs)), key=lambda i: xs[i]); xs=[xs[i] for i in order]; ys=[ys[i] for i in order]
             import bisect as _b
             def interp(x: float) -> float:
                 if x <= xs[0]: return ys[0]
                 if x >= xs[-1]: return ys[-1]
-                j = _b.bisect_left(xs, x)
-                x0,x1 = xs[j-1], xs[j]; y0,y1 = ys[j-1], ys[j]
-                if x1 == x0: return y0
-                return y0 + (y1 - y0) * ((x - x0) / (x1 - x0))
-            return [ interp(p) for p in p_list ], "APPLIED"
+                j = _b.bisect_left(xs, x); x0,x1=xs[j-1],xs[j]; y0,y1=ys[j-1],ys[j]
+                if x1==x0: return y0
+                return y0 + (y1-y0)*((x-x0)/(x1-x0))
+            return [interp(p) for p in p_list], "APPLIED"
         return p_list, "UNKNOWN_METHOD"
     except Exception:
         return p_list, "ERROR"
@@ -142,17 +132,23 @@ def _load_board_with_fallback(day_iso: str) -> tuple[List[Dict[str,Any]], str]:
     if today != day_iso:
         rows2 = _load_board_file(today)
         if rows2: return rows2, "TODAY"
-    synth = [
-        {"player":"SYNTH A","team":"SMK","stat":"PTS","line":0.0},
-        {"player":"SYNTH B","team":"SMK","stat":"REB","line":0.0},
-    ]
+    synth = [{"player":"SYNTH A","team":"SMK","stat":"PTS","line":0.0},
+             {"player":"SYNTH B","team":"SMK","stat":"REB","line":0.0}]
     return synth, "SYNTH"
 
-def score_rows(raw_rows: List[Dict[str,Any]], cfg: Dict[str,Any], day_iso: str) -> tuple[List[Dict[str,Any]], str, str, int]:
+def _clamp_edge(edge: float, source: str) -> float:
+    if source == "SYNTH":
+        if edge >= 0: return min(edge, 0.18)
+        return max(edge, -0.10)
+    return edge
+
+def score_rows(raw_rows: List[Dict[str,Any]], cfg: Dict[str,Any], day_iso: str, board_source: str) -> tuple[List[Dict[str,Any]], str, str, int]:
     rows = [_norm_row(r) for r in raw_rows]
     board_rows = len(rows)
     payouts = cfg.get("payouts") or {"Power2":3.0,"Power3":5.0,"Power4":10.0,"Power6":25.0,"Flex4":{"4":1.5,"3":0.5},"Flex5":{"5":10.0,"4":2.0}}
     slip_types = list(payouts.keys())
+    if board_source == "SYNTH":
+        slip_types = [k for k in slip_types if k in ("Power2","Power3")]
     model_cfg = cfg.get("model") or {}
     art_path = (model_cfg.get("artifacts") or {}).get("model_path") or "model_assets/model_v1.pkl"
     model_state = "MISSING"
@@ -182,7 +178,8 @@ def score_rows(raw_rows: List[Dict[str,Any]], cfg: Dict[str,Any], day_iso: str) 
         p_hit_i = float(p_cal[i] if i < len(p_cal) else 0.5)
         for s_type in slip_types:
             pay = _payout_scalar(payouts[s_type])
-            edge = round(p_hit_i * pay - 1.0, 4)
+            edge_raw = p_hit_i * pay - 1.0
+            edge = round(_clamp_edge(edge_raw, board_source), 4)
             tier = _choose_tier(edge, cfg.get("tiers"))
             out.append({"player": r.get("player"), "game_id": gid, "p_hit": round(p_hit_i, 4), "edge_pp": edge, "tier": tier, "slip_type": s_type})
     return out, model_state, cal_state, board_rows
@@ -195,6 +192,7 @@ def _append_meta(model_state: str, cal_state: str, count: int, out_csv: Path, bo
         f"CSV_ROWS={count}",
         f"BOARD_ROWS={board_rows}",
         f"BOARD_SOURCE={board_source}",
+        f"EDGE_CLAMP={'SYNTH' if board_source=='SYNTH' else 'OFF'}",
     ]
     for ln in lines: print(ln)
     with open("run_meta.txt","a") as fh: fh.write("\n".join(lines) + "\n")
@@ -208,7 +206,7 @@ def main():
     day = _iso_day(args.day)
     raw, bsrc = _load_board_with_fallback(day)
     cfg  = _load_cfg(args.cfg)
-    recs, mstate, cstate, bcount = score_rows(raw, cfg, day)
+    recs, mstate, cstate, bcount = score_rows(raw, cfg, day, bsrc)
     out = Path(f"edge_sheet_{day}.csv")
     with out.open("w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=["player","game_id","p_hit","edge_pp","tier","slip_type"])
