@@ -46,6 +46,14 @@ jobs:
               '    Standard: 1.0' >> config_pp_edge_v6.8.yaml
           fi
 
+      - name: Fetch board via ingest (non-fatal)
+        run: |
+          python3 code_data_ingest_pricefix_v1.py --date "$DAY" || true
+          mkdir -p data
+          test -s "data/pricefix_${DAY}.json" || printf '{}' > "data/pricefix_${DAY}.json"
+      - name: Emit CSV from board
+        run: |
+          python3 scripts/emit_csv_from_board.py "data/pricefix_${DAY}.json" "edge_sheet_${DAY}.csv" || true
       - name: Ensure CSV exists (guard)
         run: |
           test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
