@@ -54,8 +54,13 @@ YML
           test -f config_pp_edge_v6.8.yaml && echo "cfg_ok" || echo "cfg_missing"
           ls -l "edge_sheet_${DAY}.csv" || true
       - name: QA+Alloc
+        shell: bash
         run: |
+          set -euo pipefail
+          echo "DAY=$DAY"
+          python3 --version
           python3 scripts/run_qa_alloc.py "$DAY" --cfg config_pp_edge_v6.8.yaml --tz America/Los_Angeles || true
+          ls -l qa_report.json qa_report.csv alloc_summary.csv run_meta.txt || true
       - name: Fallback meta and CSV
         if: always()
         run: |
