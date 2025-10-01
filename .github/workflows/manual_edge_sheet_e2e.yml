@@ -1,138 +1,42 @@
-name: manual_edge_sheet_e2e.yml
+name: manual_edge_sheet_e2e
 on:
-  workflow_dispatch:
-    inputs:
-      day:
-        description: "YYYY-MM-DD; blank = today UTC"
-        required: false
-        type: string
   push:
-    paths:
-      - .github/workflows/manual_edge_sheet_e2e.yml
-      - scripts/*.py
-      - code_data_ingest_pricefix_v1.py
-      - code_cli_run_edge_sheet_v1.py
+    branches: [ "main" ]
 
 concurrency:
   group: manual_edge_sheet_e2e-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  edge_sheet:
+  e2e:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Prepare date
-        shell: bash
-        run: |
-          if [ -n "${{ github.event.inputs.day }}" ]; then
-            DAY="${{ github.event.inputs.day }}"
-          else
-            DAY="$(date -u +%F)"
-          fi
-          echo "DAY=$DAY" >> "$GITHUB_ENV"
-          echo "Using DAY=$DAY"
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-          cache: "pip"
-
-      - name: Install deps
-        shell: bash
-        run: |
-          python -m pip install --upgrade pip
-          pip install pyyaml requests pandas joblib
-
-      - name: Prep dirs
-        shell: bash
-        run: mkdir -p data
-
-      - name: Fetch board via ingest (non-fatal)
-        shell: bash
-        run: |
-          set -e
-          # Try ingest; if your script supports --out, uncomment next line:
-          # python code_data_ingest_pricefix_v1.py --date "$DAY" ${PP_LEAGUE_ID:+--league "$PP_LEAGUE_ID"} --out "data/pricefix_${DAY}.json" || true
-          python code_data_ingest_pricefix_v1.py --date "$DAY" ${PP_LEAGUE_ID:+--league "$PP_LEAGUE_ID"} || true
-          if [ ! -s "data/pricefix_${DAY}.json" ]; then
-            python3 scripts/probe_pp.py
-            mv -f resp.json "data/pricefix_${DAY}.json"
-          fi
-
-      - name: Emit CSV from board
-        shell: bash
-        run: |
-          python3 scripts/emit_csv_from_board.py "data/pricefix_${DAY}.json" "edge_sheet_${DAY}.csv" || true
-      - name: Run edge-sheet (non-fatal)
-        env:
-          PYTHONPATH: .
-        shell: bash
-        run: |
-          python code_cli_run_edge_sheet_v1.py --date "$DAY" || true
-
-      - name: Ensure CSV exists
-        shell: bash
-        run: |
-          if [ ! -f "edge_sheet_${DAY}.csv" ]; then
-            printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
-          fi
-
-      - name: Summarize meta
-      - name: Install deps (qa_alloc)
-        shell: bash
+      - name: Deps
         run: |
           python -m pip install --upgrade pip
           pip install pyyaml pandas
-
-      - name: Run QA + Alloc
-        shell: bash
-        env:
-          SLATE_TZ: America/Los_Angeles
+      - name: Resolve DAY
         run: |
-          if [ -n "${DAY:-}" ]; then python3 scripts/run_qa_alloc.py "$DAY" --cfg config_pp_edge_v6.8.yaml --tz "$SLATE_TZ" || true; else python3 scripts/run_qa_alloc.py --cfg config_pp_edge_v6.8.yaml --tz "$SLATE_TZ" || true; fi
-
-      - name: Upload QA/Alloc artifacts
+          echo "DAY=$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default tomorrow)" >> "$GITHUB_ENV"
+      - name: Ensure CSV
+        run: |
+          test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
+      - name: QA+Alloc
+        run: |
+          python3 scripts/run_qa_alloc.py "$DAY" --cfg config_pp_edge_v6.8.yaml --tz America/Los_Angeles || true
+      - name: Upload
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: qa_alloc_${{ github.run_number }}
           path: |
+            edge_sheet_${{ env.DAY }}.csv
             qa_report.json
             qa_report.csv
             alloc_summary.csv
             run_meta.txt
           if-no-files-found: warn
-
-        shell: bash
-        run: |
-          python3 scripts/summarize_meta.py "$DAY"
-
-      - name: Upload artifacts (always)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: edge_sheet_${{ env.DAY }}
-          path: |
-            data/pricefix_${{ env.DAY }}.json
-            edge_sheet_${{ env.DAY }}.csv
-            run_meta.txt
-          if-no-files-found: warn
-
-# trigger manual 2025-09-30T20:24:20Z
-
-# trigger manual 2025-09-30T20:36:40Z
-
-# trigger manual 2025-09-30T20:42:47Z
-
-# trigger manual 2025-09-30T20:49:17Z
-
-# trigger manual 2025-09-30T21:26:35Z
-
-# trigger manual 2025-09-30T21:39:20Z
