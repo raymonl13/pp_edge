@@ -79,13 +79,24 @@ jobs:
           test -f scripts/run_qa_alloc.py && echo "script_ok" || echo "script_missing"
           python3 --version
           python3 scripts/run_qa_alloc.py "$DAY" --cfg config_pp_edge_v6.8.yaml --tz America/Los_Angeles > qa_stdout.log 2> qa_stderr.log || true
-          ls -l qa_report.json qa_report.csv alloc_summary.csv run_meta.txt || true
+          ls -l qa_report.json qa_report.csv alloc_summary.csv run_meta.txt
+            data/pricefix_${{ env.DAY }}.json || true
+
+      - name: Board diagnostics
+        if: always()
+        run: |
+          set -euxo pipefail
+          test -f "data/pricefix_${DAY}.json" && du -h "data/pricefix_${DAY}.json" || true
+          test -f "data/pricefix_${DAY}.json" && head -c 300 "data/pricefix_${DAY}.json" || true
+          wc -l "edge_sheet_${DAY}.csv" || true
 
       - name: Fallback meta and CSV (force placeholders)
         if: always()
         run: |
           if [ -z "${DAY:-}" ]; then DAY="$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default tomorrow)"; echo "DAY=$DAY" >> "$GITHUB_ENV"; fi
-          test -f run_meta.txt || printf "QA_STATE=FAIL ALLOC_STATE=WARN REASON=CANCELLED_OR_EARLY_EXIT\n" > run_meta.txt
+          test -f run_meta.txt
+            data/pricefix_${{ env.DAY }}.json || printf "QA_STATE=FAIL ALLOC_STATE=WARN REASON=CANCELLED_OR_EARLY_EXIT\n" > run_meta.txt
+            data/pricefix_${{ env.DAY }}.json
           test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
           test -f qa_report.json || printf '{}' > qa_report.json
           test -f qa_report.csv || printf 'severity,msg\n' > qa_report.csv
@@ -101,14 +112,17 @@ jobs:
             qa_report.csv
             alloc_summary.csv
             run_meta.txt
+            data/pricefix_${{ env.DAY }}.json
             qa_stdout.log
             qa_stderr.log
           if-no-files-found: warn
       - name: QA gate
         if: always()
         run: |
-          if grep -Eq '^CSV_ROWS=([1-9][0-9]*)' run_meta.txt; then
-            if grep -Eq '^QA_STATE=FAIL' run_meta.txt; then
+          if grep -Eq '^CSV_ROWS=([1-9][0-9]*)' run_meta.txt
+            data/pricefix_${{ env.DAY }}.json; then
+            if grep -Eq '^QA_STATE=FAIL' run_meta.txt
+            data/pricefix_${{ env.DAY }}.json; then
               echo 'QA failed on a non-empty slate'; exit 1
             else
               echo 'QA passed/warned on a non-empty slate'; exit 0
