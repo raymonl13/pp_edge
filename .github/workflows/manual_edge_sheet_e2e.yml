@@ -49,3 +49,29 @@ CFG
 
       - name: Smoke
         run: echo "DAY is $DAY"
+      - name: QA+Alloc
+        run: |
+          set -euo pipefail
+          echo "DAY=$DAY"
+          python3 --version
+          python3 scripts/run_qa_alloc.py "$DAY" --cfg config_pp_edge_v6.8.yaml --tz America/Los_Angeles || true
+          ls -l qa_report.json qa_report.csv alloc_summary.csv run_meta.txt || true
+      - name: Fallback meta and CSV
+        if: always()
+        run: |
+          if [ -z "${DAY:-}" ]; then DAY="$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default tomorrow)"; echo "DAY=$DAY" >> "$GITHUB_ENV"; fi
+          test -f run_meta.txt || printf "QA_STATE=FAIL ALLOC_STATE=WARN REASON=CANCELLED_OR_EARLY_EXIT\n" > run_meta.txt
+          test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa_alloc_${{ github.run_number }}
+          path: |
+            edge_sheet_${{ env.DAY }}.csv
+            qa_report.json
+            qa_report.csv
+            alloc_summary.csv
+            run_meta.txt
+          if-no-files-found: warn
+
