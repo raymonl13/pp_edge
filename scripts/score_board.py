@@ -9,36 +9,28 @@ def _iso_day(day: str | None) -> str:
     return (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
 
 def _extract_rows(obj: Any) -> List[Dict[str, Any]]:
-    if isinstance(obj, list):
-        return [r for r in obj if isinstance(r, dict)]
+    if isinstance(obj, list): return [r for r in obj if isinstance(r, dict)]
     if isinstance(obj, dict):
         for k in ("rows","data","board","items","entries","legs","players"):
             v = obj.get(k)
-            if isinstance(v, list):
-                return [r for r in v if isinstance(r, dict)]
-            if isinstance(v, dict):
-                return [r for r in v.values() if isinstance(r, dict)]
+            if isinstance(v, list): return [r for r in v if isinstance(r, dict)]
+            if isinstance(v, dict): return [r for r in v.values() if isinstance(r, dict)]
         for v in obj.values():
-            if isinstance(v, list) and v and isinstance(v[0], dict):
-                return v
+            if isinstance(v, list) and v and isinstance(v[0], dict): return v
     return []
 
 def _load_board_file(day_iso: str) -> List[Dict[str, Any]]:
     p = Path(f"data/pricefix_{day_iso}.json")
     if not p.exists(): return []
-    with p.open() as f:
-        data = json.load(f)
+    with p.open() as f: data = json.load(f)
     return _extract_rows(data)
 
 def _load_cfg(path: str | Path) -> Dict[str, Any]:
     p = Path(path)
     if not p.exists(): return {}
-    try:
-        import yaml
-    except Exception:
-        return {}
-    with p.open() as f:
-        d = (yaml.safe_load(f) or {})
+    try: import yaml
+    except Exception: return {}
+    with p.open() as f: d = (yaml.safe_load(f) or {})
     return d if isinstance(d, dict) else {}
 
 def _coerce_float(x: Any, default: float = 0.0) -> float:
@@ -142,13 +134,18 @@ def _clamp_edge(edge: float, source: str) -> float:
         return max(edge, -0.10)
     return edge
 
-def score_rows(raw_rows: List[Dict[str,Any]], cfg: Dict[str,Any], day_iso: str, board_source: str) -> tuple[List[Dict[str,Any]], str, str, int]:
+def _pick_slip_types(payouts: Dict[str,Any], source: str) -> List[str]:
+    keys = list(payouts.keys())
+    if source != "SYNTH": return keys
+    pref = [k for k in keys if k in ("Power2","Power3")]
+    if pref: return pref
+    return keys[:1] if keys else []
+
+def score_rows(raw_rows: List[Dict[str,Any]], cfg: Dict[str,Any], day_iso: str, board_source: str) -> tuple[List[Dict[str,Any]], str, str, int, List[str]]:
     rows = [_norm_row(r) for r in raw_rows]
     board_rows = len(rows)
     payouts = cfg.get("payouts") or {"Power2":3.0,"Power3":5.0,"Power4":10.0,"Power6":25.0,"Flex4":{"4":1.5,"3":0.5},"Flex5":{"5":10.0,"4":2.0}}
-    slip_types = list(payouts.keys())
-    if board_source == "SYNTH":
-        slip_types = [k for k in slip_types if k in ("Power2",)]
+    slip_types = _pick_slip_types(payouts, board_source)
     model_cfg = cfg.get("model") or {}
     art_path = (model_cfg.get("artifacts") or {}).get("model_path") or "model_assets/model_v1.pkl"
     model_state = "MISSING"
@@ -182,9 +179,9 @@ def score_rows(raw_rows: List[Dict[str,Any]], cfg: Dict[str,Any], day_iso: str, 
             edge = round(_clamp_edge(edge_raw, board_source), 4)
             tier = _choose_tier(edge, cfg.get("tiers"))
             out.append({"player": r.get("player"), "game_id": gid, "p_hit": round(p_hit_i, 4), "edge_pp": edge, "tier": tier, "slip_type": s_type})
-    return out, model_state, cal_state, board_rows
+    return out, model_state, cal_state, board_rows, slip_types
 
-def _append_meta(model_state: str, cal_state: str, count: int, out_csv: Path, board_rows: int, board_source: str) -> None:
+def _append_meta(model_state: str, cal_state: str, count: int, out_csv: Path, board_rows: int, board_source: str, slip_types: List[str]) -> None:
     lines = [
         f"MODEL_STATE={model_state}",
         f"CAL_STATE={cal_state}",
@@ -193,6 +190,7 @@ def _append_meta(model_state: str, cal_state: str, count: int, out_csv: Path, bo
         f"BOARD_ROWS={board_rows}",
         f"BOARD_SOURCE={board_source}",
         f"EDGE_CLAMP={'SYNTH' if board_source=='SYNTH' else 'OFF'}",
+        f"SLIP_KEYS_USED={','.join(slip_types) if slip_types else 'NONE'}",
     ]
     for ln in lines: print(ln)
     with open("run_meta.txt","a") as fh: fh.write("\n".join(lines) + "\n")
@@ -206,14 +204,14 @@ def main():
     day = _iso_day(args.day)
     raw, bsrc = _load_board_with_fallback(day)
     cfg  = _load_cfg(args.cfg)
-    recs, mstate, cstate, bcount = score_rows(raw, cfg, day, bsrc)
+    recs, mstate, cstate, bcount, slips = score_rows(raw, cfg, day, bsrc)
     out = Path(f"edge_sheet_{day}.csv")
     with out.open("w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=["player","game_id","p_hit","edge_pp","tier","slip_type"])
         w.writeheader()
         for r in recs: w.writerow(r)
     print(f"edge sheet written -> {out} rows:{len(recs)}")
-    _append_meta(mstate, cstate, len(recs), out, bcount, bsrc)
+    _append_meta(mstate, cstate, len(recs), out, bcount, bsrc, slips)
 
 if __name__ == "__main__":
     main()
