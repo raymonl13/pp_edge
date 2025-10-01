@@ -46,3 +46,6 @@ dashboard_v3/dist/
 artifacts/
 .ci_watch.log
 .ci_run.log
+!.github/workflows/*.yml
+!docs/**/*.yml
+!docs/*.yml
