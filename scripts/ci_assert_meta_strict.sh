@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
-ROOT="${1:?}"
-META="$(find "$ROOT" -type f -name run_meta.txt | head -n1)"
-[ -n "${META:-}" ] || { echo "NO_META=1"; exit 1; }
-grep -Eq 'INGEST_STATE=(OK|WARN|FAIL)' "$META"
-grep -Eq 'CSV_STATE=(REAL|PLACEHOLDER|MISSING)' "$META"
-grep -Eq 'QA_STATE=(OK|WARN|FAIL)' "$META"
-grep -Eq 'ALLOC_STATE=(OK|WARN|FAIL)' "$META"
-echo "$META"
+d="${1:-.}"
+meta="$(find "$d" -type f -name run_meta.txt | head -n1)"
+test -f "$meta"
+grep -q '^MODEL_STATE=' "$meta"
+grep -q '^CAL_STATE=' "$meta"
+csv="$(find "$d" -type f -name 'edge_sheet_*.csv' | head -n1)"
+test -f "$csv"
+head -n1 "$csv" | grep -q 'player,game_id,p_hit,edge_pp,tier,slip_type'
+rows=$(wc -l < "$csv" | tr -d ' ')
+if [ "$rows" -lt 2 ]; then echo "ERR: empty edge_sheet"; exit 1; fi
+echo OK

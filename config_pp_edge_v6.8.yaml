@@ -68,6 +68,6 @@ model:
   artifacts:
     model_path: model_assets/model_v1.pkl
   fallback:
-    p_hit_default: 0.52
+    p_hit_default: 0.505
     stat_bias: {}
   calibration: {}
