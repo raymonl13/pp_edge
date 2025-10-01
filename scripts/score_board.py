@@ -138,7 +138,7 @@ def _load_board_with_fallback(day_iso: str) -> tuple[List[Dict[str,Any]], str]:
 
 def _clamp_edge(edge: float, source: str) -> float:
     if source == "SYNTH":
-        if edge >= 0: return min(edge, 0.18)
+        if edge >= 0: return min(edge, 0.12)
         return max(edge, -0.10)
     return edge
 
@@ -148,7 +148,7 @@ def score_rows(raw_rows: List[Dict[str,Any]], cfg: Dict[str,Any], day_iso: str, 
     payouts = cfg.get("payouts") or {"Power2":3.0,"Power3":5.0,"Power4":10.0,"Power6":25.0,"Flex4":{"4":1.5,"3":0.5},"Flex5":{"5":10.0,"4":2.0}}
     slip_types = list(payouts.keys())
     if board_source == "SYNTH":
-        slip_types = [k for k in slip_types if k in ("Power2","Power3")]
+        slip_types = [k for k in slip_types if k in ("Power2",)]
     model_cfg = cfg.get("model") or {}
     art_path = (model_cfg.get("artifacts") or {}).get("model_path") or "model_assets/model_v1.pkl"
     model_state = "MISSING"
