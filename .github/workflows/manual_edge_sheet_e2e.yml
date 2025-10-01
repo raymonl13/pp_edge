@@ -72,6 +72,8 @@ jobs:
 
       - name: QA+Alloc
         continue-on-error: true
+        env:
+          PYTHONPATH: .:${{ env.PYTHONPATH }}
         run: |
           set -euxo pipefail
           echo "PWD=$(pwd)"
