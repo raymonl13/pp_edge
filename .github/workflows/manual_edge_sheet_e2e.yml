@@ -119,14 +119,12 @@ jobs:
       - name: QA gate
         if: always()
         run: |
-          if grep -Eq '^CSV_ROWS=([1-9][0-9]*)' run_meta.txt
-            data/pricefix_${{ env.DAY }}.json; then
-            if grep -Eq '^QA_STATE=FAIL' run_meta.txt
-            data/pricefix_${{ env.DAY }}.json; then
+          if grep -Eq '^CSV_ROWS=([1-9][0-9]*)' run_meta.txt; then
+            if grep -Eq '^QA_STATE=FAIL' run_meta.txt; then
               echo 'QA failed on a non-empty slate'; exit 1
             else
-              echo 'QA passed/warned on a non-empty slate'; exit 0
+              echo 'QA OK/WARN on a non-empty slate'; exit 0
             fi
           else
-            echo 'Empty slate: skip gating'; exit 0
+            echo 'Empty slate: skip QA gate'; exit 0
           fi
