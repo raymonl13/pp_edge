@@ -5,7 +5,7 @@ on:
 
 concurrency:
   group: manual_edge_sheet_e2e-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   e2e:
@@ -22,12 +22,19 @@ jobs:
       - name: Resolve DAY
         run: |
           echo "DAY=$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default tomorrow)" >> "$GITHUB_ENV"
+          echo "DAY=$DAY"
       - name: Ensure CSV
         run: |
           test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
       - name: QA+Alloc
         run: |
           python3 scripts/run_qa_alloc.py "$DAY" --cfg config_pp_edge_v6.8.yaml --tz America/Los_Angeles || true
+      - name: Fallback meta and CSV
+        if: always()
+        run: |
+          if [ ! -f run_meta.txt ]; then printf "QA_STATE=FAIL ALLOC_STATE=WARN REASON=CANCELLED_OR_EARLY_EXIT\n" > run_meta.txt; fi
+          if [ -z "${DAY:-}" ]; then DAY="$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default tomorrow)"; echo "DAY=$DAY" >> "$GITHUB_ENV"; fi
+          test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
       - name: Upload
         if: always()
         uses: actions/upload-artifact@v4
