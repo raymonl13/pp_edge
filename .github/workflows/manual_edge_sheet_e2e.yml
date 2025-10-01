@@ -113,6 +113,11 @@ jobs:
           test -f qa_report.json || printf '{}' > qa_report.json
           test -f qa_report.csv || printf 'severity,msg\n' > qa_report.csv
           test -f alloc_summary.csv || printf 'player,game_id,tier,slip_type,stake\n' > alloc_summary.csv
+      - name: Artifact marker
+        if: always()
+        run: |
+          date -u +%FT%TZ > .artifact_marker
+
       - name: Upload
         if: always()
         uses: actions/upload-artifact@v4
@@ -131,6 +136,9 @@ jobs:
       - name: QA gate
         if: always()
         run: |
+          if [ ! -f run_meta.txt ]; then
+            echo 'No run_meta.txt → skip gate'; exit 0
+          fi
           if grep -Eq '^CSV_ROWS=([1-9][0-9]*)' run_meta.txt; then
             if grep -Eq '^QA_STATE=FAIL' run_meta.txt; then
               echo 'QA failed on a non-empty slate'; exit 1
@@ -138,5 +146,5 @@ jobs:
               echo 'QA OK/WARN on a non-empty slate'; exit 0
             fi
           else
-            echo 'Empty slate: skip QA gate'; exit 0
+            echo 'Empty slate → skip gate'; exit 0
           fi
