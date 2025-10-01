@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse, datetime, json, hashlib, csv, math, bisect
+import argparse, datetime, json, hashlib, csv, math
 from pathlib import Path
 from typing import Dict, Any, List, Tuple
 
@@ -23,7 +23,7 @@ def _extract_rows(obj: Any) -> List[Dict[str, Any]]:
                 return v
     return []
 
-def _load_board(day_iso: str) -> List[Dict[str, Any]]:
+def _load_board_file(day_iso: str) -> List[Dict[str, Any]]:
     p = Path(f"data/pricefix_{day_iso}.json")
     if not p.exists(): return []
     with p.open() as f:
@@ -107,10 +107,11 @@ def _apply_calibration(p_list: List[float], cal_cfg: Dict[str, Any] | None) -> t
             if len(xs) < 2: return p_list, "CONFIG_EMPTY"
             order = sorted(range(len(xs)), key=lambda i: xs[i])
             xs = [xs[i] for i in order]; ys = [ys[i] for i in order]
+            import bisect as _b
             def interp(x: float) -> float:
                 if x <= xs[0]: return ys[0]
                 if x >= xs[-1]: return ys[-1]
-                import bisect as _b; j = _b.bisect_left(xs, x)
+                j = _b.bisect_left(xs, x)
                 x0,x1 = xs[j-1], xs[j]; y0,y1 = ys[j-1], ys[j]
                 if x1 == x0: return y0
                 return y0 + (y1 - y0) * ((x - x0) / (x1 - x0))
@@ -134,6 +135,19 @@ def _fallback_prob(rows: List[Dict[str,Any]], fb_cfg: Dict[str,Any] | None) -> L
         out.append(min(0.95, max(0.05, p)))
     return out
 
+def _load_board_with_fallback(day_iso: str) -> tuple[List[Dict[str,Any]], str]:
+    rows = _load_board_file(day_iso)
+    if rows: return rows, "DAY"
+    today = datetime.date.today().isoformat()
+    if today != day_iso:
+        rows2 = _load_board_file(today)
+        if rows2: return rows2, "TODAY"
+    synth = [
+        {"player":"SYNTH A","team":"SMK","stat":"PTS","line":0.0},
+        {"player":"SYNTH B","team":"SMK","stat":"REB","line":0.0},
+    ]
+    return synth, "SYNTH"
+
 def score_rows(raw_rows: List[Dict[str,Any]], cfg: Dict[str,Any], day_iso: str) -> tuple[List[Dict[str,Any]], str, str, int]:
     rows = [_norm_row(r) for r in raw_rows]
     board_rows = len(rows)
@@ -154,17 +168,13 @@ def score_rows(raw_rows: List[Dict[str,Any]], cfg: Dict[str,Any], day_iso: str) 
             try:
                 p_raw = [float(x) for x in list(p_raw)]
             except Exception:
-                p_raw = _fallback_prob(rows, model_cfg.get("fallback"))
-                model_state = "ERROR"
+                p_raw = _fallback_prob(rows, model_cfg.get("fallback")); model_state = "ERROR"
             else:
-                p_raw = [min(1-1e-6, max(1e-6, x)) for x in p_raw]
-                model_state = "OK"
+                p_raw = [min(1-1e-6, max(1e-6, x)) for x in p_raw]; model_state = "OK"
         else:
-            p_raw = _fallback_prob(rows, model_cfg.get("fallback"))
-            model_state = "MISSING"
+            p_raw = _fallback_prob(rows, model_cfg.get("fallback")); model_state = "MISSING"
     except Exception:
-        p_raw = _fallback_prob(rows, model_cfg.get("fallback"))
-        model_state = "ERROR"
+        p_raw = _fallback_prob(rows, model_cfg.get("fallback")); model_state = "ERROR"
     p_cal, cal_state = _apply_calibration(p_raw, model_cfg.get("calibration"))
     out: List[Dict[str,Any]] = []
     for i, r in enumerate(rows):
@@ -177,13 +187,14 @@ def score_rows(raw_rows: List[Dict[str,Any]], cfg: Dict[str,Any], day_iso: str) 
             out.append({"player": r.get("player"), "game_id": gid, "p_hit": round(p_hit_i, 4), "edge_pp": edge, "tier": tier, "slip_type": s_type})
     return out, model_state, cal_state, board_rows
 
-def _append_meta(model_state: str, cal_state: str, count: int, out_csv: Path, board_rows: int) -> None:
+def _append_meta(model_state: str, cal_state: str, count: int, out_csv: Path, board_rows: int, board_source: str) -> None:
     lines = [
         f"MODEL_STATE={model_state}",
         f"CAL_STATE={cal_state}",
         f"SCORED_ROWS={count}",
         f"CSV_ROWS={count}",
-        f"BOARD_ROWS={board_rows}"
+        f"BOARD_ROWS={board_rows}",
+        f"BOARD_SOURCE={board_source}",
     ]
     for ln in lines: print(ln)
     with open("run_meta.txt","a") as fh: fh.write("\n".join(lines) + "\n")
@@ -195,7 +206,7 @@ def main():
     ap.add_argument("--cfg", default="config_pp_edge_v6.8.yaml")
     args = ap.parse_args()
     day = _iso_day(args.day)
-    raw = _load_board(day)
+    raw, bsrc = _load_board_with_fallback(day)
     cfg  = _load_cfg(args.cfg)
     recs, mstate, cstate, bcount = score_rows(raw, cfg, day)
     out = Path(f"edge_sheet_{day}.csv")
@@ -204,7 +215,7 @@ def main():
         w.writeheader()
         for r in recs: w.writerow(r)
     print(f"edge sheet written -> {out} rows:{len(recs)}")
-    _append_meta(mstate, cstate, len(recs), out, bcount)
+    _append_meta(mstate, cstate, len(recs), out, bcount, bsrc)
 
 if __name__ == "__main__":
     main()
