@@ -5,7 +5,7 @@ on:
 
 concurrency:
   group: manual_edge_sheet_e2e-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   e2e:
@@ -97,6 +97,10 @@ jobs:
           test -f qa_report.csv || printf 'severity,msg\n' > qa_report.csv
           test -f alloc_summary.csv || printf 'player,game_id,tier,slip_type,stake\n' > alloc_summary.csv
 
+      - name: QA gate
+        if: always()
+        run: |
+          if grep -Eq '^QA_STATE=FAIL' run_meta.txt; then echo 'QA failed'; exit 1; fi
       - name: Upload
         if: always()
         uses: actions/upload-artifact@v4
