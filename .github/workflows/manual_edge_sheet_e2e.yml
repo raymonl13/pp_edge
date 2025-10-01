@@ -53,6 +53,14 @@ jobs:
           python3 code_data_ingest_pricefix_v1.py --date "$DAY" || true
           mkdir -p data
           test -s "data/pricefix_${DAY}.json" || printf '{}' > "data/pricefix_${DAY}.json"
+      - name: Fallback board ingest (today)
+        run: |
+          if [ -f "data/pricefix_${DAY}.json" ] && [ $(wc -c < "data/pricefix_${DAY}.json") -lt 1500 ]; then
+            echo 'Primary board small; trying LA today as fallback';
+            DAY_TODAY="$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default today)";
+            python3 code_data_ingest_pricefix_v1.py --date "$DAY_TODAY" || true;
+            test -s "data/pricefix_${DAY_TODAY}.json" && cp "data/pricefix_${DAY_TODAY}.json" "data/pricefix_${DAY}.json" || true;
+          fi
 
       - name: Emit CSV from board
         run: |
