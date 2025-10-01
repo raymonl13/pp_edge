@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
@@ -23,7 +24,8 @@ jobs:
 
       - name: Resolve DAY
         run: |
-          echo "DAY=$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default tomorrow)" >> "$GITHUB_ENV"
+          DAY="$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default tomorrow)"
+          echo "DAY=$DAY" >> "$GITHUB_ENV"
           echo "DAY=$DAY"
 
       - name: Ensure config default (printf, no heredoc)
@@ -51,12 +53,15 @@ jobs:
           python3 code_data_ingest_pricefix_v1.py --date "$DAY" || true
           mkdir -p data
           test -s "data/pricefix_${DAY}.json" || printf '{}' > "data/pricefix_${DAY}.json"
+
       - name: Emit CSV from board
         run: |
           python3 scripts/emit_csv_from_board.py "data/pricefix_${DAY}.json" "edge_sheet_${DAY}.csv" || true
+
       - name: Ensure CSV exists (guard)
         run: |
           test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
+          head -n 3 "edge_sheet_${DAY}.csv" || true
 
       - name: Preflight QA+Alloc
         continue-on-error: true
@@ -68,10 +73,11 @@ jobs:
       - name: QA+Alloc
         continue-on-error: true
         run: |
-          set -euo pipefail
-          echo "DAY=$DAY"
+          set -euxo pipefail
+          echo "PWD=$(pwd)"
+          test -f scripts/run_qa_alloc.py && echo "script_ok" || echo "script_missing"
           python3 --version
-          python3 scripts/run_qa_alloc.py "$DAY" --cfg config_pp_edge_v6.8.yaml --tz America/Los_Angeles || true
+          python3 scripts/run_qa_alloc.py "$DAY" --cfg config_pp_edge_v6.8.yaml --tz America/Los_Angeles > qa_stdout.log 2> qa_stderr.log || true
           ls -l qa_report.json qa_report.csv alloc_summary.csv run_meta.txt || true
 
       - name: Fallback meta and CSV (force placeholders)
@@ -95,4 +101,6 @@ jobs:
             qa_report.csv
             alloc_summary.csv
             run_meta.txt
+            qa_stdout.log
+            qa_stderr.log
           if-no-files-found: warn
