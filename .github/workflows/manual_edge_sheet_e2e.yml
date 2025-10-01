@@ -1,7 +1,7 @@
 name: manual_edge_sheet_e2e
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
 
 concurrency:
   group: manual_edge_sheet_e2e-${{ github.ref }}
@@ -26,24 +26,24 @@ jobs:
           echo "DAY=$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default tomorrow)" >> "$GITHUB_ENV"
           echo "DAY=$DAY"
 
-      - name: Ensure config default
+      - name: Ensure config default (printf, no heredoc)
         run: |
           if [ ! -f config_pp_edge_v6.8.yaml ]; then
-            cat > config_pp_edge_v6.8.yaml <<'CFG'
-qa:
-  min_rows: 100
-  max_demon_per_slip: 1
-allocator:
-  starting: 1000.0
-  slip_cap: 25.0
-  slate_cap_frac: 0.1
-  kelly_fraction: 0.5
-tiers:
-  kelly_multiplier:
-    Demon: 1.2
-    Goblin: 0.9
-    Standard: 1.0
-CFG
+            :> config_pp_edge_v6.8.yaml
+            printf '%s\n' \
+              'qa:' \
+              '  min_rows: 100' \
+              '  max_demon_per_slip: 1' \
+              'allocator:' \
+              '  starting: 1000.0' \
+              '  slip_cap: 25.0' \
+              '  slate_cap_frac: 0.1' \
+              '  kelly_fraction: 0.5' \
+              'tiers:' \
+              '  kelly_multiplier:' \
+              '    Demon: 1.2' \
+              '    Goblin: 0.9' \
+              '    Standard: 1.0' >> config_pp_edge_v6.8.yaml
           fi
 
       - name: Ensure CSV exists (guard)
@@ -66,7 +66,7 @@ CFG
           python3 scripts/run_qa_alloc.py "$DAY" --cfg config_pp_edge_v6.8.yaml --tz America/Los_Angeles || true
           ls -l qa_report.json qa_report.csv alloc_summary.csv run_meta.txt || true
 
-      - name: Fallback meta and CSV
+      - name: Fallback meta and CSV (force placeholders)
         if: always()
         run: |
           if [ -z "${DAY:-}" ]; then DAY="$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default tomorrow)"; echo "DAY=$DAY" >> "$GITHUB_ENV"; fi
@@ -75,13 +75,6 @@ CFG
           test -f qa_report.json || printf '{}' > qa_report.json
           test -f qa_report.csv || printf 'severity,msg\n' > qa_report.csv
           test -f alloc_summary.csv || printf 'player,game_id,tier,slip_type,stake\n' > alloc_summary.csv
-
-      - name: Sanity list before Upload
-        if: always()
-        run: |
-          echo "DAY=${DAY}"
-          ls -l edge_sheet_${DAY}.csv || true
-          ls -l qa_report.json qa_report.csv alloc_summary.csv run_meta.txt || true
 
       - name: Upload
         if: always()
