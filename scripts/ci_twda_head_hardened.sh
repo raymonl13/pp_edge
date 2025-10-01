@@ -6,7 +6,7 @@ headsha="$(git rev-parse HEAD)"
 command -v gh >/dev/null 2>&1
 rid=""
 for i in $(seq 1 120); do
-  rid="$(gh run list --workflow "$wf" --branch "$br" --json databaseId,headSha,status,createdAt --limit 40 \
+  rid="$(gh run list --workflow "$wf" --branch "$br" --json databaseId,headSha,status --limit 40 \
     --jq 'map(select(.headSha=="'"$headsha"'"))|.[0].databaseId' || true)"
   [ -n "$rid" ] && break
   sleep 2
@@ -16,14 +16,13 @@ gh run watch "$rid" >&2 || true
 out="artifacts/$rid"
 rm -rf "$out"; mkdir -p "$out"
 if gh run download "$rid" -D "$out" >&2; then
-  printf "%s\n" "$out"
-  exit 0
+  printf "%s\n" "$out"; exit 0
 fi
-jobids="$(gh run view "$rid" --json jobs --jq '.jobs[].id' || true)"
 mkdir -p "$out/logs"
-if [ -n "$jobids" ]; then
+jobs="$(gh run view "$rid" --json jobs --jq '.jobs[].id' || true)"
+if [ -n "${jobs:-}" ]; then
   while read -r jid; do
-    gh run view "$rid" --job "$jid" --log > "$out/logs/$jid.log" || true
-  done <<<"$jobids"
+    gh run view "$rid" --job "$jid" --log > "$out/logs/$jid.log" 2>/dev/null || true
+  done <<<"$jobs"
 fi
 printf "%s\n" "$out"

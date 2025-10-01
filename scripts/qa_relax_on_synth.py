@@ -10,11 +10,9 @@ for ln in lines:
         k,v=ln.split("=",1); d[k.strip()]=v.strip()
 if d.get("BOARD_SOURCE")=="SYNTH":
     out=[]
-    seen=set()
     for ln in lines:
-        if ln.startswith("QA_STATE="):
-            if d.get("CSV_ROWS","0")!="0" and d.get("QA_STATE")=="FAIL":
-                ln="QA_STATE=WARN SYNTH"
-        out.append(ln); seen.add(ln.split("=")[0] if "=" in ln else ln)
+        if ln.startswith("QA_STATE=") and d.get("CSV_ROWS","0")!="0" and d.get("QA_STATE")=="FAIL":
+            ln="QA_STATE=WARN SYNTH"
+        out.append(ln)
     m.write_text("\n".join(out)+"\n")
 print("OK")
