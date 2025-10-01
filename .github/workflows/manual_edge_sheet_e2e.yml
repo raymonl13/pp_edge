@@ -62,11 +62,6 @@ jobs:
         run: |
           test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
           head -n 3 "edge_sheet_${DAY}.csv" || true
-
-      - name: Inject smoke row if empty
-        run: |
-          python3 scripts/inject_smoke_row.py "edge_sheet_${DAY}.csv" || true
-
       - name: Preflight QA+Alloc
         continue-on-error: true
         run: |
