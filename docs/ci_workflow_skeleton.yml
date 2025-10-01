@@ -1,0 +1,45 @@
+# Copy into .github/workflows/<new>.yml and adapt jobs/steps
+name: ci_workflow_skeleton
+on:
+  push:
+    branches: ["main"]
+
+concurrency:
+  group: skeleton-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sample:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.10" }
+      - name: Deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+      - name: Preflight
+        continue-on-error: true
+        run: |
+          set -euxo pipefail
+          echo "PWD=$(pwd)"; ls -al
+      - name: Fallback & Marker
+        if: always()
+        run: |
+          echo "STATE=OK" > run_meta.txt
+          date -u +%FT%TZ > .artifact_marker
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sample_${{ github.run_number }}
+          path: |
+            run_meta.txt
+            .artifact_marker
+          if-no-files-found: warn
+      - name: QA gate
+        if: always()
+        run: |
+          if [ ! -f run_meta.txt ]; then echo 'No meta → skip gate'; exit 0; fi
+          echo 'Gate OK'; exit 0
