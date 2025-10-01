@@ -138,8 +138,8 @@ def _pick_slip_types(payouts: Dict[str,Any], source: str) -> List[str]:
     keys = list(payouts.keys())
     if source != "SYNTH": return keys
     pref = [k for k in keys if k in ("Power2","Power3")]
-    if pref: return pref
-    return keys[:1] if keys else []
+    if pref: return pref[:2]
+    return keys[:2] if keys else []
 
 def score_rows(raw_rows: List[Dict[str,Any]], cfg: Dict[str,Any], day_iso: str, board_source: str) -> tuple[List[Dict[str,Any]], str, str, int, List[str]]:
     rows = [_norm_row(r) for r in raw_rows]

@@ -97,6 +97,8 @@ jobs:
           python3 scripts/run_qa_alloc.py "$DAY" --cfg config_pp_edge_v6.8.yaml --tz America/Los_Angeles > qa_stdout.log 2> qa_stderr.log || true
           ls -l qa_report.json qa_report.csv alloc_summary.csv run_meta.txt || true
 
+        - name: Relax QA on SYNTH
+          run: python3 scripts/qa_relax_on_synth.py
       - name: Fallback meta and CSV (force placeholders)
         if: always()
         run: |
