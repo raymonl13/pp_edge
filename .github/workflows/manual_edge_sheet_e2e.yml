@@ -114,6 +114,16 @@ jobs:
         run: |
           date -u +%FT%TZ > .artifact_marker
 
+        - name: Ensure pre-upload placeholders
+          if: always()
+          run: |
+            test -f alloc_summary.csv || printf 'player,game_id,tier,slip_type,stake\n' > alloc_summary.csv
+            test -f qa_report.csv || printf 'severity,msg\n' > qa_report.csv
+            test -f qa_report.json || printf '{}' > qa_report.json
+            meta="run_meta.txt"; test -f "$meta" || printf "CSV_ROWS=0\n" > "$meta"
+            f="edge_sheet_${DAY}.csv"; test -f "$f" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "$f"
+            if [ -z "${DAY:-}" ]; then DAY="$(date -u +%F)"; fi
+            set -euo pipefail
       - name: Upload
         if: always()
         uses: actions/upload-artifact@v4
