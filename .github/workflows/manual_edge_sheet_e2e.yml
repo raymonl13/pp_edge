@@ -20,6 +20,26 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyyaml pandas
       - name: Resolve DAY
+      - name: Ensure config default
+        shell: bash
+        run: |
+          if [ ! -f config_pp_edge_v6.8.yaml ]; then
+            cat > config_pp_edge_v6.8.yaml <<'YML'
+qa:
+  min_rows: 100
+  max_demon_per_slip: 1
+allocator:
+  starting: 1000.0
+  slip_cap: 25.0
+  slate_cap_frac: 0.1
+  kelly_fraction: 0.5
+tiers:
+  kelly_multiplier:
+    Demon: 1.2
+    Goblin: 0.9
+    Standard: 1.0
+YML
+          fi
         run: |
           echo "DAY=$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default tomorrow)" >> "$GITHUB_ENV"
           echo "DAY=$DAY"
