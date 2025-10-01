@@ -1,0 +1,24 @@
+name: diag_manual
+on:
+  push:
+    branches: ["main"]
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: reviewdog/action-actionlint@v1
+      - name: Print manual workflow with line numbers
+        run: nl -ba .github/workflows/manual_edge_sheet_e2e.yml
+      - name: Parse manual workflow YAML
+        run: |
+          python - <<'PY'
+          import sys, yaml
+          s=open(".github/workflows/manual_edge_sheet_e2e.yml","r",encoding="utf-8").read()
+          try:
+              yaml.safe_load(s)
+              print("YAML_OK")
+          except Exception as e:
+              print("YAML_ERR:", e)
+              sys.exit(1)
+          PY
