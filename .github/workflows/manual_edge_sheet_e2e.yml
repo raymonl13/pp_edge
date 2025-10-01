@@ -59,16 +59,6 @@ jobs:
           python3 scripts/emit_csv_from_board.py "data/pricefix_${DAY}.json" "edge_sheet_${DAY}.csv" || true
 
       - name: Ensure CSV exists (guard)
-      - name: Lower QA threshold for smoke
-        run: |
-          python - <<'PYP'
-          import yaml, sys
-          p='config_pp_edge_v6.8.yaml'
-          d=yaml.safe_load(open(p)) or {}
-          d.setdefault('qa',{}).update({'min_rows': 1})
-          open(p,'w').write(yaml.safe_dump(d, sort_keys=False))
-          print('min_rows=1 set for smoke')
-          PYP
         run: |
           test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
           head -n 3 "edge_sheet_${DAY}.csv" || true
@@ -84,6 +74,7 @@ jobs:
         continue-on-error: true
         env:
           PYTHONPATH: .:${{ env.PYTHONPATH }}
+          QA_MIN_ROWS: "1"
         run: |
           set -euxo pipefail
           echo "PWD=$(pwd)"
