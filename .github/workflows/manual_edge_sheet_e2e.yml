@@ -13,6 +13,10 @@ on:
       - code_data_ingest_pricefix_v1.py
       - code_cli_run_edge_sheet_v1.py
 
+concurrency:
+  group: manual_edge_sheet_e2e-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   edge_sheet:
     runs-on: ubuntu-latest
