@@ -55,3 +55,19 @@ model_assets:
 min_edge_pp: 0.05
 qa:
   min_rows: 5
+
+tiers:
+  Demon:
+    min_edge: 0.12
+  Goblin:
+    min_edge: 0.06
+  Standard:
+    min_edge: -1.0
+
+model:
+  artifacts:
+    model_path: model_assets/model_v1.pkl
+  fallback:
+    p_hit_default: 0.52
+    stat_bias: {}
+  calibration: {}

@@ -63,8 +63,8 @@ jobs:
             test -s "data/pricefix_${DAY_TODAY}.json" && cp "data/pricefix_${DAY_TODAY}.json" "data/pricefix_${DAY}.json" || true
           fi
 
-      - name: Emit CSV from board
-        run: |
+      - name: Score board
+        run: python3 scripts/score_board.py "$DAY" --cfg config_pp_edge_v6.8.yaml
           python3 scripts/emit_csv_from_board.py "data/pricefix_${DAY}.json" "edge_sheet_${DAY}.csv" || true
 
       - name: Ensure CSV exists (guard)
