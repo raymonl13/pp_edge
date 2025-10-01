@@ -96,11 +96,6 @@ jobs:
           test -f qa_report.json || printf '{}' > qa_report.json
           test -f qa_report.csv || printf 'severity,msg\n' > qa_report.csv
           test -f alloc_summary.csv || printf 'player,game_id,tier,slip_type,stake\n' > alloc_summary.csv
-
-      - name: QA gate
-        if: always()
-        run: |
-          if grep -Eq '^QA_STATE=FAIL' run_meta.txt; then echo 'QA failed'; exit 1; fi
       - name: Upload
         if: always()
         uses: actions/upload-artifact@v4
@@ -115,3 +110,7 @@ jobs:
             qa_stdout.log
             qa_stderr.log
           if-no-files-found: warn
+      - name: QA gate
+        if: always()
+        run: |
+          if grep -Eq '^QA_STATE=FAIL' run_meta.txt; then echo 'QA failed'; exit 1; fi
