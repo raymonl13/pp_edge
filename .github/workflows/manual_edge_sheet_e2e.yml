@@ -5,7 +5,7 @@ on:
 
 concurrency:
   group: manual_edge_sheet_e2e-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   e2e:
@@ -53,13 +53,14 @@ jobs:
           python3 code_data_ingest_pricefix_v1.py --date "$DAY" || true
           mkdir -p data
           test -s "data/pricefix_${DAY}.json" || printf '{}' > "data/pricefix_${DAY}.json"
+
       - name: Fallback board ingest (today)
         run: |
           if [ -f "data/pricefix_${DAY}.json" ] && [ $(wc -c < "data/pricefix_${DAY}.json") -lt 1500 ]; then
-            echo 'Primary board small; trying LA today as fallback';
-            DAY_TODAY="$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default today)";
-            python3 code_data_ingest_pricefix_v1.py --date "$DAY_TODAY" || true;
-            test -s "data/pricefix_${DAY_TODAY}.json" && cp "data/pricefix_${DAY_TODAY}.json" "data/pricefix_${DAY}.json" || true;
+            echo 'Primary board small; trying LA today as fallback'
+            DAY_TODAY="$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default today)"
+            python3 code_data_ingest_pricefix_v1.py --date "$DAY_TODAY" || true
+            test -s "data/pricefix_${DAY_TODAY}.json" && cp "data/pricefix_${DAY_TODAY}.json" "data/pricefix_${DAY}.json" || true
           fi
 
       - name: Emit CSV from board
@@ -67,13 +68,18 @@ jobs:
           python3 scripts/emit_csv_from_board.py "data/pricefix_${DAY}.json" "edge_sheet_${DAY}.csv" || true
 
       - name: Ensure CSV exists (guard)
-      - name: Inject smoke row if empty
-        if: ${{ env.SMOKE_INJECT == '1' }}
-        run: |
-          python3 scripts/inject_smoke_row.py "edge_sheet_${DAY}.csv" || true
         run: |
           test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
           head -n 3 "edge_sheet_${DAY}.csv" || true
+
+      - name: Board diagnostics
+        if: always()
+        run: |
+          set -euxo pipefail
+          test -f "data/pricefix_${DAY}.json" && du -h "data/pricefix_${DAY}.json" || true
+          test -f "data/pricefix_${DAY}.json" && head -c 300 "data/pricefix_${DAY}.json" || true
+          wc -l "edge_sheet_${DAY}.csv" || true
+
       - name: Preflight QA+Alloc
         continue-on-error: true
         run: |
@@ -91,28 +97,18 @@ jobs:
           test -f scripts/run_qa_alloc.py && echo "script_ok" || echo "script_missing"
           python3 --version
           python3 scripts/run_qa_alloc.py "$DAY" --cfg config_pp_edge_v6.8.yaml --tz America/Los_Angeles > qa_stdout.log 2> qa_stderr.log || true
-          ls -l qa_report.json qa_report.csv alloc_summary.csv run_meta.txt
-            data/pricefix_${{ env.DAY }}.json || true
-
-      - name: Board diagnostics
-        if: always()
-        run: |
-          set -euxo pipefail
-          test -f "data/pricefix_${DAY}.json" && du -h "data/pricefix_${DAY}.json" || true
-          test -f "data/pricefix_${DAY}.json" && head -c 300 "data/pricefix_${DAY}.json" || true
-          wc -l "edge_sheet_${DAY}.csv" || true
+          ls -l qa_report.json qa_report.csv alloc_summary.csv run_meta.txt || true
 
       - name: Fallback meta and CSV (force placeholders)
         if: always()
         run: |
-          if [ -z "${DAY:-}" ]; then DAY="$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default tomorrow)"; echo "DAY=$DAY" >> "$GITHUB_ENV"; fi
-          test -f run_meta.txt
-            data/pricefix_${{ env.DAY }}.json || printf "QA_STATE=FAIL ALLOC_STATE=WARN REASON=CANCELLED_OR_EARLY_EXIT\n" > run_meta.txt
-            data/pricefix_${{ env.DAY }}.json
+          if [ -z "${DAY:-}" ]; then DAY="$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default today)"; echo "DAY=$DAY" >> "$GITHUB_ENV"; fi
+          test -f run_meta.txt || printf "QA_STATE=FAIL ALLOC_STATE=WARN REASON=CANCELLED_OR_EARLY_EXIT\n" > run_meta.txt
           test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
           test -f qa_report.json || printf '{}' > qa_report.json
           test -f qa_report.csv || printf 'severity,msg\n' > qa_report.csv
           test -f alloc_summary.csv || printf 'player,game_id,tier,slip_type,stake\n' > alloc_summary.csv
+
       - name: Artifact marker
         if: always()
         run: |
@@ -125,14 +121,16 @@ jobs:
           name: qa_alloc_${{ github.run_number }}
           path: |
             edge_sheet_${{ env.DAY }}.csv
+            data/pricefix_${{ env.DAY }}.json
             qa_report.json
             qa_report.csv
             alloc_summary.csv
             run_meta.txt
-            data/pricefix_${{ env.DAY }}.json
             qa_stdout.log
             qa_stderr.log
+            .artifact_marker
           if-no-files-found: warn
+
       - name: QA gate
         if: always()
         run: |
