@@ -9,4 +9,13 @@ jobs:
   noop:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "workflow parses and job starts"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Resolve DAY
+        run: |
+          echo "DAY=$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default tomorrow)" >> "$GITHUB_ENV"
+          echo "DAY=$DAY"
+      - name: Smoke
+        run: echo "DAY is $DAY"
