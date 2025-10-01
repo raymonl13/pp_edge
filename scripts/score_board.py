@@ -130,7 +130,7 @@ def _load_board_with_fallback(day_iso: str) -> tuple[List[Dict[str,Any]], str]:
 
 def _clamp_edge(edge: float, source: str) -> float:
     if source == "SYNTH":
-        if edge >= 0: return min(edge, 0.12)
+        if edge >= 0: return min(edge, 0.06)
         return max(edge, -0.10)
     return edge
 
