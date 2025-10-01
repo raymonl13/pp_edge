@@ -73,7 +73,6 @@ jobs:
         continue-on-error: true
         env:
           PYTHONPATH: .:${{ env.PYTHONPATH }}
-          QA_MIN_ROWS: "1"
         run: |
           set -euxo pipefail
           echo "PWD=$(pwd)"
