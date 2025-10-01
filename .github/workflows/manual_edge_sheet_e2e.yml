@@ -35,6 +35,13 @@ jobs:
           if [ ! -f run_meta.txt ]; then printf "QA_STATE=FAIL ALLOC_STATE=WARN REASON=CANCELLED_OR_EARLY_EXIT\n" > run_meta.txt; fi
           if [ -z "${DAY:-}" ]; then DAY="$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default tomorrow)"; echo "DAY=$DAY" >> "$GITHUB_ENV"; fi
           test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
+      - name: Sanity list before Upload
+        if: always()
+        run: |
+          echo "DAY=${DAY}"
+          ls -l edge_sheet_${DAY}.csv || true
+          ls -l qa_report.json qa_report.csv alloc_summary.csv run_meta.txt || true
+
       - name: Upload
         if: always()
         uses: actions/upload-artifact@v4
