@@ -20,6 +20,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyyaml pandas
       - name: Resolve DAY
+      - name: Fetch board via ingest (non-fatal)
+        shell: bash
+        run: |
+          python3 code_data_ingest_pricefix_v1.py --date "$DAY" || true
+          mkdir -p data
+          test -s "data/pricefix_${DAY}.json" || printf '{}' > "data/pricefix_${DAY}.json"
+      - name: Emit CSV from board
+        shell: bash
+        run: |
+          python3 scripts/emit_csv_from_board.py "data/pricefix_${DAY}.json" "edge_sheet_${DAY}.csv" || true
       - name: Ensure config default
         shell: bash
         run: |
