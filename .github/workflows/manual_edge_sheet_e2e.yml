@@ -58,6 +58,8 @@ jobs:
         run: python3 scripts/score_board.py "$DAY" --cfg config_pp_edge_v6.8.yaml
       - name: Diagnose slips
         run: python3 scripts/diagnose_slips.py "$DAY" --cfg config_pp_edge_v6.8.yaml
+      - name: Build slips
+        run: python3 scripts/build_slips.py "$DAY" --cfg config_pp_edge_v6.8.yaml
       - name: Ensure CSV exists (guard)
         run: |
           test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
@@ -103,8 +105,6 @@ jobs:
           [ -f alloc_summary.csv ] || printf 'player,game_id,tier,slip_type,stake\n' > alloc_summary.csv
           [ -f slips.json ] || printf '{"day":"%s","slips":[]}\n' "$(date -u +%F)" > slips.json
           [ -f alloc_slips.csv ] || printf 'slip_id,slip_type,size,ev,ev_method,players,games\n' > alloc_slips.csv
-      - name: Build slips
-        run: python3 scripts/build_slips.py "$DAY" --cfg config_pp_edge_v6.8.yaml
       - name: Ensure slip meta
         run: python3 scripts/ensure_slip_meta.py
       - name: Upload
