@@ -100,6 +100,8 @@ jobs:
           [ -f qa_report.json ] || printf '{}' > qa_report.json
           [ -f qa_report.csv ] || printf 'severity,msg\n' > qa_report.csv
           [ -f alloc_summary.csv ] || printf 'player,game_id,tier,slip_type,stake\n' > alloc_summary.csv
+      - name: Build slips
+        run: python3 scripts/build_slips.py "$DAY" --cfg config_pp_edge_v6.8.yaml
       - name: Upload
         if: always()
         uses: actions/upload-artifact@v4
