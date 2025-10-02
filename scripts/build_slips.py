@@ -10,19 +10,20 @@ def iso_day(day: str | None) -> str:
     return (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
 
 def load_cfg(path: str) -> Dict[str, Any]:
-    p=Path(path)
+    p = Path(path)
     if not p.exists(): return {}
     try:
         import yaml
-        with p.open() as f: d=yaml.safe_load(f) or {}
+        with p.open() as f: d = yaml.safe_load(f) or {}
         return d if isinstance(d,dict) else {}
     except Exception:
         return {}
 
 def read_legs(csv_path: Path) -> List[Dict[str,Any]]:
     out=[]
+    if not csv_path.exists(): return out
     with csv_path.open() as f:
-        r=csv.DictReader(f)
+        r = csv.DictReader(f)
         for row in r:
             try:
                 out.append({
@@ -47,12 +48,6 @@ def choose_slip_sizes(payouts: Dict[str,Any]) -> Dict[str,int]:
             try: sizes[k]=int(k.replace("Flex",""))
             except: pass
     return sizes
-
-def pick_slip_keys_prefer(payouts: Dict[str,Any], prefer: List[str], limit: int) -> List[str]:
-    keys=list(payouts.keys())
-    ordered=[k for k in prefer if k in keys]
-    rest=[k for k in keys if k not in ordered]
-    return (ordered+rest)[:limit]
 
 def power_ev(ps: List[float], payout: float) -> float:
     prod=1.0
@@ -125,6 +120,7 @@ def main():
             fh.write("SLIP_EV_METHOD=none\n")
             fh.write("SLIP_KEYS_OBSERVED=NONE\n")
         print("SLIPS_BUILT=0"); return
+
     cfg=load_cfg(args.cfg)
     payouts=cfg.get("payouts") or {"Power2":3.0,"Power3":5.0,"Power4":10.0,"Power6":25.0,"Flex4":{"4":1.5,"3":0.5},"Flex5":{"5":10.0,"4":2.0}}
     slip_cfg=cfg.get("slips") or {}
@@ -132,26 +128,44 @@ def main():
     max_types=int(slip_cfg.get("max_types",2))
     max_slips_per_type=int(slip_cfg.get("max_slips_per_type",5))
     sizes=choose_slip_sizes(payouts)
+
     legs=read_legs(csv_path)
     legs=[l for l in legs if 0.0<=l["p_hit"]<=1.0]
-    observed=list(dict.fromkeys([l["slip_type"] for l in legs]))
-    chosen=pick_slip_keys_prefer(payouts, prefer, max_types)
-    def build(chosen_types: List[str]) -> List[Dict[str,Any]]:
-        slips=[]
-        for st in chosen_types:
-            if st not in sizes: continue
-            size=sizes[st]
-            pool=[l for l in legs if l["slip_type"]==st]
-            if not pool: continue
+
+    # observed keys in order of appearance
+    observed=[]; seen=set()
+    for l in legs:
+        st=l["slip_type"]
+        if st not in seen:
+            observed.append(st); seen.add(st)
+
+    # pool sizes per type
+    pools={t:[l for l in legs if l["slip_type"]==t] for t in set(observed + list(payouts.keys()))}
+    pool_sizes={t:len(pools[t]) for t in pools}
+    req_sizes={t:sizes.get(t,0) for t in pools}
+
+    # candidate list: prefer first, then observed not already in prefer
+    cand=[]
+    for t in prefer:
+        if t not in cand: cand.append(t)
+    for t in observed:
+        if t not in cand: cand.append(t)
+
+    # feasibility filter
+    feasible=[t for t in cand if req_sizes.get(t,0)>0 and pool_sizes.get(t,0)>=req_sizes.get(t,0)]
+    selected=feasible[:max_types]
+    skipped=[t for t in cand if t not in selected]
+
+    slips=[]
+    for st in selected:
+        size=req_sizes.get(st,0)
+        pool=pools.get(st,[])
+        if size and len(pool)>=size:
             slips.extend(build_for_type(pool, size, st, payouts, max_slips_per_type))
-        return slips
-    slips=build(chosen)
-    used="prefer"
-    if not slips and observed:
-        obs=observed[:max_types]
-        slips=build(obs)
-        used="observed"
+
     slips_sorted=sorted(slips, key=lambda x: x["ev"], reverse=True)
+
+    # write artifacts
     Path("slips.json").write_text(json.dumps({"day":day,"slips":slips_sorted}, separators=(",",":")))
     with open("alloc_slips.csv","w",newline="") as f:
         w=csv.writer(f)
@@ -160,9 +174,22 @@ def main():
             players="|".join([l["player"] for l in s["legs"]])
             games="|".join([l["game_id"] for l in s["legs"]])
             w.writerow([s["slip_id"],s["slip_type"],s["size"],s["ev"],s["ev_method"],players, games])
+
+    # meta
     with open("run_meta.txt","a") as fh:
         fh.write(f"SLIPS_BUILT={len(slips_sorted)}\n")
-        fh.write(f"SLIP_KEYS_METHOD={used}\n")
+        fh.write(f"SLIP_KEYS_METHOD={'prefer' if selected and selected[0] in prefer else ('observed' if selected else 'none')}\n")
         fh.write(f"SLIP_EV_METHOD={(slips_sorted[0]['ev_method'] if slips_sorted else 'none')}\n")
         fh.write(f"SLIP_KEYS_OBSERVED={','.join(observed) if observed else 'NONE'}\n")
+        fh.write(f"SLIP_KEYS_SELECTED={','.join(selected) if selected else 'NONE'}\n")
+        # include feasibility reasons for skipped types
+        if skipped:
+            reasons=[]
+            for t in skipped:
+                rs=req_sizes.get(t,0); ps=pool_sizes.get(t,0)
+                if rs==0: reasons.append(f"{t}:no_size")
+                elif ps<rs: reasons.append(f"{t}:pool{ps}<{rs}")
+                else: reasons.append(f"{t}:deprioritized")
+            fh.write("SLIP_KEYS_SKIPPED="+";".join(reasons)+"\n")
+
     print(f"SLIPS_BUILT={len(slips_sorted)}")
