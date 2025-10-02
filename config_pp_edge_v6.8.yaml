@@ -71,3 +71,8 @@ model:
     p_hit_default: 0.505
     stat_bias: {}
   calibration: {}
+slips:
+
+  max_slips_per_type: 3
+  max_types: 1
+  slip_types: ["Power4"]
