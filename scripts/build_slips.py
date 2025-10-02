@@ -132,26 +132,20 @@ def main():
     legs=read_legs(csv_path)
     legs=[l for l in legs if 0.0<=l["p_hit"]<=1.0]
 
-    # observed keys in order of appearance
     observed=[]; seen=set()
     for l in legs:
         st=l["slip_type"]
         if st not in seen:
             observed.append(st); seen.add(st)
 
-    # pool sizes per type
     pools={t:[l for l in legs if l["slip_type"]==t] for t in set(observed + list(payouts.keys()))}
     pool_sizes={t:len(pools[t]) for t in pools}
     req_sizes={t:sizes.get(t,0) for t in pools}
 
-    # candidate list: prefer first, then observed not already in prefer
-    cand=[]
-    for t in prefer:
-        if t not in cand: cand.append(t)
-    for t in observed:
-        if t not in cand: cand.append(t)
+    # candidate list: prefer first, then observed not in prefer
+    cand=list(dict.fromkeys(prefer + [t for t in observed if t not in prefer]))
 
-    # feasibility filter
+    # feasible types
     feasible=[t for t in cand if req_sizes.get(t,0)>0 and pool_sizes.get(t,0)>=req_sizes.get(t,0)]
     selected=feasible[:max_types]
     skipped=[t for t in cand if t not in selected]
@@ -163,9 +157,21 @@ def main():
         if size and len(pool)>=size:
             slips.extend(build_for_type(pool, size, st, payouts, max_slips_per_type))
 
+    # feasibility fallback: if nothing built but a feasible observed type exists, force-build one slip
+    if not slips:
+        obs_feasible=[t for t in observed if req_sizes.get(t,0)>0 and pool_sizes.get(t,0)>=req_sizes.get(t,0)]
+        if obs_feasible:
+            fb=obs_feasible[0]
+            size=req_sizes.get(fb,0)
+            pool=pools.get(fb,[])
+            if size and len(pool)>=size:
+                slips.extend(build_for_type(pool, size, fb, payouts, max_slips=1))
+                selected=[fb]
+                skipped=[t for t in cand if t!=fb]
+                prefer=[]  # method below will report 'observed' for fallback
+
     slips_sorted=sorted(slips, key=lambda x: x["ev"], reverse=True)
 
-    # write artifacts
     Path("slips.json").write_text(json.dumps({"day":day,"slips":slips_sorted}, separators=(",",":")))
     with open("alloc_slips.csv","w",newline="") as f:
         w=csv.writer(f)
@@ -175,14 +181,13 @@ def main():
             games="|".join([l["game_id"] for l in s["legs"]])
             w.writerow([s["slip_id"],s["slip_type"],s["size"],s["ev"],s["ev_method"],players, games])
 
-    # meta
     with open("run_meta.txt","a") as fh:
         fh.write(f"SLIPS_BUILT={len(slips_sorted)}\n")
-        fh.write(f"SLIP_KEYS_METHOD={'prefer' if selected and selected[0] in prefer else ('observed' if selected else 'none')}\n")
+        method='fallback' if slips_sorted and selected and selected[0] not in prefer else ('prefer' if selected and selected[0] in prefer else ('observed' if selected else 'none'))
+        fh.write(f"SLIP_KEYS_METHOD={method}\n")
         fh.write(f"SLIP_EV_METHOD={(slips_sorted[0]['ev_method'] if slips_sorted else 'none')}\n")
         fh.write(f"SLIP_KEYS_OBSERVED={','.join(observed) if observed else 'NONE'}\n")
         fh.write(f"SLIP_KEYS_SELECTED={','.join(selected) if selected else 'NONE'}\n")
-        # include feasibility reasons for skipped types
         if skipped:
             reasons=[]
             for t in skipped:
