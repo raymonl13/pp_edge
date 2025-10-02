@@ -102,6 +102,14 @@ jobs:
           [ -f alloc_summary.csv ] || printf 'player,game_id,tier,slip_type,stake\n' > alloc_summary.csv
       - name: Build slips
         run: python3 scripts/build_slips.py "$DAY" --cfg config_pp_edge_v6.8.yaml
+    - name: Ensure slip meta lines
+      run: |
+        set -euo pipefail
+        m="run_meta.txt"
+        need=(SLIPS_BUILT SLIP_KEYS_METHOD SLIP_KEYS_OBSERVED SLIP_EV_METHOD)
+        miss=0
+        for k in "${need[@]}"; do grep -q "^$k=" "$m" 2>/dev/null || miss=1; done
+        if [ "$miss" -eq 1 ]; then python3 scripts/build_slips.py "$DAY" --cfg config_pp_edge_v6.8.yaml; fi
       - name: Upload
         if: always()
         uses: actions/upload-artifact@v4
