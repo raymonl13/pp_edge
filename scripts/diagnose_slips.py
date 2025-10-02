@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import csv, itertools, json, math
+import csv, itertools, json
 from pathlib import Path
 from typing import Dict, Any, List, Tuple
 
@@ -20,9 +20,7 @@ def read_cfg(path: Path) -> Dict[str,Any]:
     if not path.exists(): return {}
     try:
         import yaml
-        with path.open() as f:
-            d=yaml.safe_load(f) or {}
-            return d if isinstance(d,dict) else {}
+        with path.open() as f: return (yaml.safe_load(f) or {}) if isinstance(yaml.safe_load(f) or {},dict) else {}
     except Exception:
         return {}
 
@@ -34,12 +32,12 @@ def read_legs(edge_csv: Path) -> List[Dict[str,Any]]:
         for row in r:
             try:
                 out.append({
-                    "player": row["player"],
-                    "game_id": row["game_id"],
+                    "player": (row["player"] or "").strip(),
+                    "game_id": (row["game_id"] or "").strip(),
                     "p_hit": float(row["p_hit"]),
                     "edge_pp": float(row["edge_pp"]),
-                    "tier": row["tier"],
-                    "slip_type": row["slip_type"],
+                    "tier": (row["tier"] or "").strip(),
+                    "slip_type": (row["slip_type"] or "").strip(),
                 })
             except Exception:
                 continue
@@ -57,23 +55,18 @@ def slip_sizes(payouts: Dict[str,Any]) -> Dict[str,int]:
     return sizes
 
 def combos_after_guard(pool: List[Dict[str,Any]], size:int, cap:int=50000) -> Tuple[int,int]:
-    n=len(pool)
-    total=nCr(n,size)
-    built=0
+    n=len(pool); total=nCr(n,size); built=0
     if total==0: return total,0
-    # Enumerate exactly for small totals; otherwise sample up to cap
     limit=min(total, cap)
     it=itertools.combinations(pool, size)
     i=0
     for combo in it:
         i+=1
         players=[c["player"] for c in combo]
-        games=[c["game_id"] for c in combo]
-        if len(players)==len(set(players)) and len(games)==len(set(games)):
+        if len(players)==len(set(players)):  # allow same-game; only block duplicate players
             built+=1
         if i>=limit: break
     if total>cap:
-        # scale up estimate; conservative floor
         built=int(built * (total/limit))
     return total, built
 
@@ -89,31 +82,22 @@ def main():
     payouts=cfg.get("payouts") or {"Power2":3.0,"Power3":5.0,"Power4":10.0,"Power6":25.0,"Flex4":{"4":1.5,"3":0.5},"Flex5":{"5":10.0,"4":2.0}}
     sizes=slip_sizes(payouts)
     legs=read_legs(edge_csv)
-    # observed keys present in the legs
-    observed=[]
-    seen=set()
+    observed=[]; seen=set()
     for l in legs:
         st=l["slip_type"]
-        if st not in seen:
-            observed.append(st); seen.add(st)
-    # per-type diagnostics
+        if st not in seen: observed.append(st); seen.add(st)
     diag={"day":day,"types":[]}
     for st in sorted(set(list(payouts.keys())+observed)):
         pool=[l for l in legs if l["slip_type"]==st]
-        n=len(pool)
-        sz=sizes.get(st,0)
+        n=len(pool); sz=sizes.get(st,0)
         uniq_players=len({l["player"] for l in pool})
         uniq_games=len({l["game_id"] for l in pool})
-        reason=[]
-        if sz==0:
-            reason.append("no_size_for_type")
-        if n<sz:
-            reason.append(f"insufficient_pool:{n}<{sz}")
-        total,built=(0,0)
+        reason=[]; total,built=(0,0)
+        if sz==0: reason.append("no_size_for_type")
+        if n<sz:  reason.append(f"insufficient_pool:{n}<{sz}")
         if sz>0 and n>=sz:
             total,built=combos_after_guard(pool, sz, cap=200000)
-            if built==0 and total>0:
-                reason.append("guard_eliminated_all")
+            if built==0 and total>0: reason.append("guard_eliminated_all")
         diag["types"].append({
             "slip_type": st,
             "required_size": sz,
@@ -124,14 +108,11 @@ def main():
             "built_combos": built,
             "reason": reason,
         })
-    # write artifacts
     Path("slip_diag.json").write_text(json.dumps(diag, indent=2))
     with open("slip_diag.txt","w") as f:
         for t in diag["types"]:
             f.write(f"{t['slip_type']}: pool={t['pool_size']} size={t['required_size']} uniqP={t['uniq_players']} uniqG={t['uniq_games']} total={t['total_combos']} built={t['built_combos']} reason={';'.join(t['reason']) or 'ok'}\n")
-    # meta shorthand
-    lines=[]
-    lines.append("SLIP_DIAG_TYPES=" + ",".join([t["slip_type"] for t in diag["types"]]))
+    lines=["SLIP_DIAG_TYPES="+",".join([t["slip_type"] for t in diag["types"]])]
     for t in diag["types"]:
         lines.append(f"SLIP_DIAG_{t['slip_type']}=pool:{t['pool_size']}/size:{t['required_size']}/uniqP:{t['uniq_players']}/uniqG:{t['uniq_games']}/combos:{t['built_combos']}/{t['total_combos']}/reason:{';'.join(t['reason']) or 'ok'}")
     with open("run_meta.txt","a") as fh:

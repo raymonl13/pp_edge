@@ -26,14 +26,13 @@ def read_legs(csv_path: Path) -> List[Dict[str,Any]]:
         r = csv.DictReader(f)
         for row in r:
             try:
-                st=(row["slip_type"] or "").strip()
                 out.append({
                     "player": (row["player"] or "").strip(),
                     "game_id": (row["game_id"] or "").strip(),
                     "p_hit": float(row["p_hit"]),
                     "edge_pp": float(row["edge_pp"]),
                     "tier": (row["tier"] or "").strip(),
-                    "slip_type": st,
+                    "slip_type": (row["slip_type"] or "").strip(),
                 })
             except Exception:
                 continue
@@ -78,8 +77,8 @@ def combo_ev(ps: List[float], slip_type: str, payouts: Dict[str,Any]) -> Tuple[f
         return flex_ev(ps,{str(k):float(vv) for k,vv in v.items()}),"combo_exact"
     return power_ev(ps,1.0),"unknown"
 
-def non_overlapping(players: List[str], games: List[str]) -> bool:
-    return len(players)==len(set(players)) and len(games)==len(set(games))
+def unique_players_only(players: List[str]) -> bool:
+    return len(players)==len(set(players))
 
 def rank_legs(legs: List[Dict[str,Any]], max_pool: int) -> List[Dict[str,Any]]:
     return sorted(legs, key=lambda x: (x.get("edge_pp",0.0), x.get("p_hit",0.0)), reverse=True)[:max_pool]
@@ -89,8 +88,7 @@ def build_for_type(legs_by_type: List[Dict[str,Any]], size: int, slip_type: str,
     out=[]; seen=set()
     for combo in itertools.combinations(legs, size):
         players=[c["player"] for c in combo]
-        games=[c["game_id"] for c in combo]
-        if not non_overlapping(players,games): continue
+        if not unique_players_only(players): continue
         ps=[max(1e-6,min(1-1e-6,c["p_hit"])) for c in combo]
         ev,method=combo_ev(ps, slip_type, payouts)
         slip_id="slip-"+str(abs(hash(tuple([(c["player"],c["game_id"],slip_type) for c in combo]))))[:12]
@@ -135,11 +133,11 @@ def main():
 
     observed=[]; seen=set()
     for l in legs:
-        st=l["slip_type"].strip()
+        st=l["slip_type"]
         if st not in seen:
             observed.append(st); seen.add(st)
 
-    pools={t:[l for l in legs if l["slip_type"].strip()==t] for t in set(observed + list(payouts.keys()))}
+    pools={t:[l for l in legs if l["slip_type"]==t] for t in set(observed + list(payouts.keys()))}
     pool_sizes={t:len(pools[t]) for t in pools}
     req_sizes={t:sizes.get(t,0) for t in pools}
 
@@ -166,11 +164,10 @@ def main():
                 slips.extend(build_for_type(pool, size, fb, payouts, max_slips=1))
                 selected=[fb]
                 skipped=[t for t in cand if t!=fb]
-                prefer=[]  # so method reports 'fallback'
+                prefer=[]  # method → 'fallback'
 
     slips_sorted=sorted(slips, key=lambda x: x["ev"], reverse=True)
 
-    # Debug state for this run
     debug={
         "day": day,
         "prefer": prefer,
