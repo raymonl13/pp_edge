@@ -67,6 +67,8 @@ jobs:
           test -f config_pp_edge_v6.8.yaml && echo "cfg_ok" || echo "cfg_missing"
           ls -l "edge_sheet_${DAY}.csv" || true
 
+      - name: Score board
+        run: python3 scripts/score_board.py "$DAY" --cfg config_pp_edge_v6.8.yaml
       - name: QA+Alloc
         continue-on-error: true
         env:
