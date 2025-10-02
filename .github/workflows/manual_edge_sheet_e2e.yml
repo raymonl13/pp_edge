@@ -107,6 +107,8 @@ jobs:
           [ -f alloc_slips.csv ] || printf 'slip_id,slip_type,size,ev,ev_method,players,games\n' > alloc_slips.csv
       - name: Ensure slip meta
         run: python3 scripts/ensure_slip_meta.py
+      - name: Run debug report
+        run: python3 scripts/run_debug_report.py
       - name: Upload
         if: always()
         uses: actions/upload-artifact@v4
