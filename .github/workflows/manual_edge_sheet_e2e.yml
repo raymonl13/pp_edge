@@ -91,6 +91,7 @@ jobs:
           wc -l "edge_sheet_${DAY}.csv" || true
 
       - name: Fallback meta and CSV (force placeholders)
+        continue-on-error: true
         if: always()
         run: |
           if [ -z "${DAY:-}" ]; then DAY="$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default tomorrow)"; echo "DAY=$DAY" >> "$GITHUB_ENV"; fi

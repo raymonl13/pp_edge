@@ -15,7 +15,9 @@ done
 gh run watch "$rid" >&2 || true
 out="artifacts/$rid"
 rm -rf "$out"; mkdir -p "$out"
-if gh run download "$rid" -D "$out" >&2; then printf "%s\n" "$out"; exit 0; fi
+if gh run download "$rid" -D "$out" >&2; then
+  printf "%s\n" "$out"; exit 0
+fi
 mkdir -p "$out/logs"
 gh run view "$rid" --log > "$out/logs/run.log" 2>/dev/null || true
 jobs="$(gh run view "$rid" --json jobs --jq '.jobs[].id' || true)"
