@@ -67,8 +67,6 @@ jobs:
           test -f config_pp_edge_v6.8.yaml && echo "cfg_ok" || echo "cfg_missing"
           ls -l "edge_sheet_${DAY}.csv" || true
 
-      - name: Score board
-        run: python3 scripts/score_board.py "$DAY" --cfg config_pp_edge_v6.8.yaml
       - name: QA+Alloc
         continue-on-error: true
         env:
@@ -94,14 +92,14 @@ jobs:
         continue-on-error: true
         if: always()
         run: |
-          if [ -z "${DAY:-}" ]; then DAY="$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default tomorrow)"; echo "DAY=$DAY" >> "$GITHUB_ENV"; fi
-          test -f run_meta.txt
-            data/pricefix_${{ env.DAY }}.json || printf "QA_STATE=FAIL ALLOC_STATE=WARN REASON=CANCELLED_OR_EARLY_EXIT\n" > run_meta.txt
-            data/pricefix_${{ env.DAY }}.json
-          test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
-          test -f qa_report.json || printf '{}' > qa_report.json
-          test -f qa_report.csv || printf 'severity,msg\n' > qa_report.csv
-          test -f alloc_summary.csv || printf 'player,game_id,tier,slip_type,stake\n' > alloc_summary.csv
+          set -euo pipefail
+          if [ -z "${DAY:-}" ]; then DAY="$(date -u +%F)"; fi
+          f="edge_sheet_${DAY}.csv"; [ -s "$f" ] || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "$f"
+          meta="run_meta.txt"; [ -f "$meta" ] || printf "CSV_ROWS=0\n" > "$meta"
+          grep -q "^CSV_ROWS=" "$meta" || printf "CSV_ROWS=0\n" >> "$meta"
+          [ -f qa_report.json ] || printf '{}' > qa_report.json
+          [ -f qa_report.csv ] || printf 'severity,msg\n' > qa_report.csv
+          [ -f alloc_summary.csv ] || printf 'player,game_id,tier,slip_type,stake\n' > alloc_summary.csv
       - name: Upload
         if: always()
         uses: actions/upload-artifact@v4
