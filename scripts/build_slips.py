@@ -22,17 +22,18 @@ def load_cfg(path: str) -> Dict[str, Any]:
 def read_legs(csv_path: Path) -> List[Dict[str,Any]]:
     out=[]
     if not csv_path.exists(): return out
-    with csv_path.open() as f:
+    with csv_path.open(newline="") as f:
         r = csv.DictReader(f)
         for row in r:
             try:
+                st=(row["slip_type"] or "").strip()
                 out.append({
-                    "player": row["player"],
-                    "game_id": row["game_id"],
+                    "player": (row["player"] or "").strip(),
+                    "game_id": (row["game_id"] or "").strip(),
                     "p_hit": float(row["p_hit"]),
                     "edge_pp": float(row["edge_pp"]),
-                    "tier": row["tier"],
-                    "slip_type": row["slip_type"],
+                    "tier": (row["tier"] or "").strip(),
+                    "slip_type": st,
                 })
             except Exception:
                 continue
@@ -124,7 +125,7 @@ def main():
     cfg=load_cfg(args.cfg)
     payouts=cfg.get("payouts") or {"Power2":3.0,"Power3":5.0,"Power4":10.0,"Power6":25.0,"Flex4":{"4":1.5,"3":0.5},"Flex5":{"5":10.0,"4":2.0}}
     slip_cfg=cfg.get("slips") or {}
-    prefer=slip_cfg.get("slip_types") or ["Power2","Power3"]
+    prefer=[str(x).strip() for x in (slip_cfg.get("slip_types") or ["Power2","Power3"])]
     max_types=int(slip_cfg.get("max_types",2))
     max_slips_per_type=int(slip_cfg.get("max_slips_per_type",5))
     sizes=choose_slip_sizes(payouts)
@@ -134,18 +135,15 @@ def main():
 
     observed=[]; seen=set()
     for l in legs:
-        st=l["slip_type"]
+        st=l["slip_type"].strip()
         if st not in seen:
             observed.append(st); seen.add(st)
 
-    pools={t:[l for l in legs if l["slip_type"]==t] for t in set(observed + list(payouts.keys()))}
+    pools={t:[l for l in legs if l["slip_type"].strip()==t] for t in set(observed + list(payouts.keys()))}
     pool_sizes={t:len(pools[t]) for t in pools}
     req_sizes={t:sizes.get(t,0) for t in pools}
 
-    # candidate list: prefer first, then observed not in prefer
     cand=list(dict.fromkeys(prefer + [t for t in observed if t not in prefer]))
-
-    # feasible types
     feasible=[t for t in cand if req_sizes.get(t,0)>0 and pool_sizes.get(t,0)>=req_sizes.get(t,0)]
     selected=feasible[:max_types]
     skipped=[t for t in cand if t not in selected]
@@ -157,7 +155,7 @@ def main():
         if size and len(pool)>=size:
             slips.extend(build_for_type(pool, size, st, payouts, max_slips_per_type))
 
-    # feasibility fallback: if nothing built but a feasible observed type exists, force-build one slip
+    # feasibility fallback: if nothing built, force first feasible observed type
     if not slips:
         obs_feasible=[t for t in observed if req_sizes.get(t,0)>0 and pool_sizes.get(t,0)>=req_sizes.get(t,0)]
         if obs_feasible:
@@ -168,9 +166,24 @@ def main():
                 slips.extend(build_for_type(pool, size, fb, payouts, max_slips=1))
                 selected=[fb]
                 skipped=[t for t in cand if t!=fb]
-                prefer=[]  # method below will report 'observed' for fallback
+                prefer=[]  # so method reports 'fallback'
 
     slips_sorted=sorted(slips, key=lambda x: x["ev"], reverse=True)
+
+    # Debug state for this run
+    debug={
+        "day": day,
+        "prefer": prefer,
+        "observed": observed,
+        "pool_sizes": pool_sizes,
+        "req_sizes": req_sizes,
+        "cand": cand,
+        "feasible": feasible,
+        "selected": selected,
+        "skipped": skipped,
+        "slips_built": len(slips_sorted)
+    }
+    Path("slip_builder_debug.json").write_text(json.dumps(debug, indent=2))
 
     Path("slips.json").write_text(json.dumps({"day":day,"slips":slips_sorted}, separators=(",",":")))
     with open("alloc_slips.csv","w",newline="") as f:
