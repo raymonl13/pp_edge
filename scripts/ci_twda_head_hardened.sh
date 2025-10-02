@@ -19,12 +19,10 @@ if gh run download "$rid" -D "$out" >&2; then
   printf "%s\n" "$out"; exit 0
 fi
 mkdir -p "$out/logs"
-if gh run view "$rid" --log > "$out/logs/run.log" 2>/dev/null; then
-  printf "%s\n" "$out"; exit 0
-fi
+gh run view "$rid" --log > "$out/logs/run.log" 2>/dev/null || true
 jobs="$(gh run view "$rid" --json jobs --jq '.jobs[].name' || true)"
 if [ -n "${jobs:-}" ]; then
-  echo "$jobs" | while read -r jn; do
+  printf "%s\n" "$jobs" | while IFS= read -r jn; do
     [ -n "$jn" ] && gh run view "$rid" --job "$jn" --log > "$out/logs/${jn// /_}.log" 2>/dev/null || true
   done
 fi
