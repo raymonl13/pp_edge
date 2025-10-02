@@ -141,6 +141,21 @@ jobs:
             .artifact_marker
           if-no-files-found: warn
 
+        - name: Upload
+          if: always()
+          uses: actions/upload-artifact@v4
+          with:
+            name: qa_alloc_auto
+            path: |
+              edge_sheet_*.csv
+              qa_report.json
+              qa_report.csv
+              alloc_summary.csv
+              run_meta.txt
+              .artifact_marker
+            if-no-files-found: ignore
+            compression-level: 6
+            overwrite: false
       - name: QA gate
         if: always()
         run: |
