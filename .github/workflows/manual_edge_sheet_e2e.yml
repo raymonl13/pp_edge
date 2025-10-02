@@ -54,10 +54,8 @@ jobs:
           mkdir -p data
           test -s "data/pricefix_${DAY}.json" || printf '{}' > "data/pricefix_${DAY}.json"
 
-      - name: Emit CSV from board
-        run: |
-          python3 scripts/emit_csv_from_board.py "data/pricefix_${DAY}.json" "edge_sheet_${DAY}.csv" || true
-
+      - name: Score board
+        run: python3 scripts/score_board.py "$DAY" --cfg config_pp_edge_v6.8.yaml
       - name: Ensure CSV exists (guard)
         run: |
           test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
@@ -91,6 +89,7 @@ jobs:
           wc -l "edge_sheet_${DAY}.csv" || true
 
       - name: Fallback meta and CSV (force placeholders)
+        continue-on-error: true
         if: always()
         run: |
           if [ -z "${DAY:-}" ]; then DAY="$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default tomorrow)"; echo "DAY=$DAY" >> "$GITHUB_ENV"; fi
@@ -101,6 +100,8 @@ jobs:
           test -f qa_report.json || printf '{}' > qa_report.json
           test -f qa_report.csv || printf 'severity,msg\n' > qa_report.csv
           test -f alloc_summary.csv || printf 'player,game_id,tier,slip_type,stake\n' > alloc_summary.csv
+      - name: Build slips
+        run: python3 scripts/build_slips.py "$DAY" --cfg config_pp_edge_v6.8.yaml
       - name: Upload
         if: always()
         uses: actions/upload-artifact@v4
@@ -115,6 +116,8 @@ jobs:
             data/pricefix_${{ env.DAY }}.json
             qa_stdout.log
             qa_stderr.log
+            alloc_slips.csv
+            slips.json
           if-no-files-found: warn
       - name: QA gate
         if: always()
