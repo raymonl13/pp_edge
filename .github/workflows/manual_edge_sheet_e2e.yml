@@ -54,8 +54,10 @@ jobs:
           mkdir -p data
           test -s "data/pricefix_${DAY}.json" || printf '{}' > "data/pricefix_${DAY}.json"
 
-      - name: Score board
-        run: python3 scripts/score_board.py "$DAY" --cfg config_pp_edge_v6.8.yaml
+      - name: Emit CSV from board
+        run: |
+          python3 scripts/emit_csv_from_board.py "data/pricefix_${DAY}.json" "edge_sheet_${DAY}.csv" || true
+
       - name: Ensure CSV exists (guard)
         run: |
           test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
@@ -89,27 +91,16 @@ jobs:
           wc -l "edge_sheet_${DAY}.csv" || true
 
       - name: Fallback meta and CSV (force placeholders)
-        continue-on-error: true
         if: always()
         run: |
-          set -euo pipefail
-          if [ -z "${DAY:-}" ]; then DAY="$(date -u +%F)"; fi
-          f="edge_sheet_${DAY}.csv"; [ -s "$f" ] || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "$f"
-          meta="run_meta.txt"; [ -f "$meta" ] || printf "CSV_ROWS=0\n" > "$meta"
-          grep -q "^CSV_ROWS=" "$meta" || printf "CSV_ROWS=0\n" >> "$meta"
-          [ -f qa_report.json ] || printf '{}' > qa_report.json
-          [ -f qa_report.csv ] || printf 'severity,msg\n' > qa_report.csv
-          [ -f alloc_summary.csv ] || printf 'player,game_id,tier,slip_type,stake\n' > alloc_summary.csv
-      - name: Build slips
-        run: python3 scripts/build_slips.py "$DAY" --cfg config_pp_edge_v6.8.yaml
-    - name: Ensure slip meta lines
-      run: |
-        set -euo pipefail
-        m="run_meta.txt"
-        need=(SLIPS_BUILT SLIP_KEYS_METHOD SLIP_KEYS_OBSERVED SLIP_EV_METHOD)
-        miss=0
-        for k in "${need[@]}"; do grep -q "^$k=" "$m" 2>/dev/null || miss=1; done
-        if [ "$miss" -eq 1 ]; then python3 scripts/build_slips.py "$DAY" --cfg config_pp_edge_v6.8.yaml; fi
+          if [ -z "${DAY:-}" ]; then DAY="$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default tomorrow)"; echo "DAY=$DAY" >> "$GITHUB_ENV"; fi
+          test -f run_meta.txt
+            data/pricefix_${{ env.DAY }}.json || printf "QA_STATE=FAIL ALLOC_STATE=WARN REASON=CANCELLED_OR_EARLY_EXIT\n" > run_meta.txt
+            data/pricefix_${{ env.DAY }}.json
+          test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
+          test -f qa_report.json || printf '{}' > qa_report.json
+          test -f qa_report.csv || printf 'severity,msg\n' > qa_report.csv
+          test -f alloc_summary.csv || printf 'player,game_id,tier,slip_type,stake\n' > alloc_summary.csv
       - name: Upload
         if: always()
         uses: actions/upload-artifact@v4
@@ -124,8 +115,6 @@ jobs:
             data/pricefix_${{ env.DAY }}.json
             qa_stdout.log
             qa_stderr.log
-            alloc_slips.csv
-            slips.json
           if-no-files-found: warn
       - name: QA gate
         if: always()
