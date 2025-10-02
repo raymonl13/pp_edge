@@ -1,23 +1,18 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-from pathlib import Path
-import re
-wf = Path(".github/workflows/manual_edge_sheet_e2e.yml")
-t = wf.read_text(); L = t.splitlines()
-idx = [i for i,l in enumerate(L) if re.match(r'^\s*-\s*name:\s*',l)]
-def bounds(k): s=idx[k]; e=idx[k+1] if k+1<len(idx) else len(L); return s,e
+from pathlib import Path, re
+wf=Path(".github/workflows/manual_edge_sheet_e2e.yml")
+L=wf.read_text().splitlines()
+idx=[i for i,l in enumerate(L) if re.match(r'^\s*-\s*name:\s*', l)]
+def blk(k): s=idx[k]; e=idx[k+1] if k+1<len(idx) else len(L); return s,e
 for k in range(len(idx)):
     if re.search(r'^\s*-\s*name:\s*Fallback meta and CSV \(force placeholders\)\s*$', L[idx[k]]):
-        s,e = bounds(k)
-        # insert or replace 'continue-on-error: true' inside the step
-        found=False
+        s,e=blk(k); found=False
         for j in range(s+1,e):
-            m=re.match(r'^(\s*)continue-on-error:\s*(.+)$', L[j])
-            if m:
-                L[j]=f"{m.group(1)}continue-on-error: true"; found=True; break
+            m=re.match(r'^(\s*)continue-on-error:\s*', L[j])
+            if m: L[j]=f"{m.group(1)}continue-on-error: true"; found=True; break
         if not found:
-            ind=re.match(r'^(\s*)',L[s]).group(1)+"  "
+            ind=re.match(r'^(\s*)', L[idx[k]]).group(1)+"  "
             L.insert(s+1, f"{ind}continue-on-error: true")
         break
-wf.write_text("\n".join(L))
-print("OK")
+wf.write_text("\n".join(L)); print("OK")
