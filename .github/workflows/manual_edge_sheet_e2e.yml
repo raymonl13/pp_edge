@@ -5,7 +5,7 @@ on:
 
 concurrency:
   group: manual_edge_sheet_e2e-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   e2e:
@@ -54,30 +54,14 @@ jobs:
           mkdir -p data
           test -s "data/pricefix_${DAY}.json" || printf '{}' > "data/pricefix_${DAY}.json"
 
-      - name: Fallback board ingest (today)
+      - name: Emit CSV from board
         run: |
-          if [ -f "data/pricefix_${DAY}.json" ] && [ $(wc -c < "data/pricefix_${DAY}.json") -lt 1500 ]; then
-            echo 'Primary board small; trying LA today as fallback'
-            DAY_TODAY="$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default today)"
-            python3 code_data_ingest_pricefix_v1.py --date "$DAY_TODAY" || true
-            test -s "data/pricefix_${DAY_TODAY}.json" && cp "data/pricefix_${DAY_TODAY}.json" "data/pricefix_${DAY}.json" || true
-          fi
+          python3 scripts/emit_csv_from_board.py "data/pricefix_${DAY}.json" "edge_sheet_${DAY}.csv" || true
 
-      - name: Score board
-        run: python3 scripts/score_board.py "$DAY" --cfg config_pp_edge_v6.8.yaml
       - name: Ensure CSV exists (guard)
         run: |
           test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
           head -n 3 "edge_sheet_${DAY}.csv" || true
-
-      - name: Board diagnostics
-        if: always()
-        run: |
-          set -euxo pipefail
-          test -f "data/pricefix_${DAY}.json" && du -h "data/pricefix_${DAY}.json" || true
-          test -f "data/pricefix_${DAY}.json" && head -c 300 "data/pricefix_${DAY}.json" || true
-          wc -l "edge_sheet_${DAY}.csv" || true
-
       - name: Preflight QA+Alloc
         continue-on-error: true
         run: |
@@ -95,35 +79,28 @@ jobs:
           test -f scripts/run_qa_alloc.py && echo "script_ok" || echo "script_missing"
           python3 --version
           python3 scripts/run_qa_alloc.py "$DAY" --cfg config_pp_edge_v6.8.yaml --tz America/Los_Angeles > qa_stdout.log 2> qa_stderr.log || true
-          ls -l qa_report.json qa_report.csv alloc_summary.csv run_meta.txt || true
+          ls -l qa_report.json qa_report.csv alloc_summary.csv run_meta.txt
+            data/pricefix_${{ env.DAY }}.json || true
 
-        - name: Relax QA on SYNTH
-          run: python3 scripts/qa_relax_on_synth.py
+      - name: Board diagnostics
+        if: always()
+        run: |
+          set -euxo pipefail
+          test -f "data/pricefix_${DAY}.json" && du -h "data/pricefix_${DAY}.json" || true
+          test -f "data/pricefix_${DAY}.json" && head -c 300 "data/pricefix_${DAY}.json" || true
+          wc -l "edge_sheet_${DAY}.csv" || true
+
       - name: Fallback meta and CSV (force placeholders)
         if: always()
         run: |
-          if [ -z "${DAY:-}" ]; then DAY="$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default today)"; echo "DAY=$DAY" >> "$GITHUB_ENV"; fi
-          test -f run_meta.txt || printf "QA_STATE=FAIL ALLOC_STATE=WARN REASON=CANCELLED_OR_EARLY_EXIT\n" > run_meta.txt
+          if [ -z "${DAY:-}" ]; then DAY="$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default tomorrow)"; echo "DAY=$DAY" >> "$GITHUB_ENV"; fi
+          test -f run_meta.txt
+            data/pricefix_${{ env.DAY }}.json || printf "QA_STATE=FAIL ALLOC_STATE=WARN REASON=CANCELLED_OR_EARLY_EXIT\n" > run_meta.txt
+            data/pricefix_${{ env.DAY }}.json
           test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
           test -f qa_report.json || printf '{}' > qa_report.json
           test -f qa_report.csv || printf 'severity,msg\n' > qa_report.csv
           test -f alloc_summary.csv || printf 'player,game_id,tier,slip_type,stake\n' > alloc_summary.csv
-
-      - name: Artifact marker
-        if: always()
-        run: |
-          date -u +%FT%TZ > .artifact_marker
-
-        - name: Ensure pre-upload placeholders
-          if: always()
-          run: |
-            test -f alloc_summary.csv || printf 'player,game_id,tier,slip_type,stake\n' > alloc_summary.csv
-            test -f qa_report.csv || printf 'severity,msg\n' > qa_report.csv
-            test -f qa_report.json || printf '{}' > qa_report.json
-            meta="run_meta.txt"; test -f "$meta" || printf "CSV_ROWS=0\n" > "$meta"
-            f="edge_sheet_${DAY}.csv"; test -f "$f" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "$f"
-            if [ -z "${DAY:-}" ]; then DAY="$(date -u +%F)"; fi
-            set -euo pipefail
       - name: Upload
         if: always()
         uses: actions/upload-artifact@v4
@@ -131,37 +108,17 @@ jobs:
           name: qa_alloc_${{ github.run_number }}
           path: |
             edge_sheet_${{ env.DAY }}.csv
-            data/pricefix_${{ env.DAY }}.json
             qa_report.json
             qa_report.csv
             alloc_summary.csv
             run_meta.txt
+            data/pricefix_${{ env.DAY }}.json
             qa_stdout.log
             qa_stderr.log
-            .artifact_marker
           if-no-files-found: warn
-
-        - name: Upload
-          if: always()
-          uses: actions/upload-artifact@v4
-          with:
-            name: qa_alloc_auto
-            path: |
-              edge_sheet_*.csv
-              qa_report.json
-              qa_report.csv
-              alloc_summary.csv
-              run_meta.txt
-              .artifact_marker
-            if-no-files-found: ignore
-            compression-level: 6
-            overwrite: false
       - name: QA gate
         if: always()
         run: |
-          if [ ! -f run_meta.txt ]; then
-            echo 'No run_meta.txt → skip gate'; exit 0
-          fi
           if grep -Eq '^CSV_ROWS=([1-9][0-9]*)' run_meta.txt; then
             if grep -Eq '^QA_STATE=FAIL' run_meta.txt; then
               echo 'QA failed on a non-empty slate'; exit 1
@@ -169,5 +126,5 @@ jobs:
               echo 'QA OK/WARN on a non-empty slate'; exit 0
             fi
           else
-            echo 'Empty slate → skip gate'; exit 0
+            echo 'Empty slate: skip QA gate'; exit 0
           fi
