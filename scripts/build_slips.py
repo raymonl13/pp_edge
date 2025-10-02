@@ -119,6 +119,11 @@ def main():
     day=iso_day(args.day)
     csv_path=Path(f"edge_sheet_{day}.csv")
     if not csv_path.exists():
+        with open("run_meta.txt","a") as fh:
+            fh.write("SLIPS_BUILT=0\n")
+            fh.write("SLIP_KEYS_METHOD=none\n")
+            fh.write("SLIP_EV_METHOD=none\n")
+            fh.write("SLIP_KEYS_OBSERVED=NONE\n")
         print("SLIPS_BUILT=0"); return
     cfg=load_cfg(args.cfg)
     payouts=cfg.get("payouts") or {"Power2":3.0,"Power3":5.0,"Power4":10.0,"Power6":25.0,"Flex4":{"4":1.5,"3":0.5},"Flex5":{"5":10.0,"4":2.0}}
@@ -143,7 +148,6 @@ def main():
     slips=build(chosen)
     used="prefer"
     if not slips and observed:
-        # fall back to observed slip types from the legs
         obs=observed[:max_types]
         slips=build(obs)
         used="observed"
@@ -159,7 +163,6 @@ def main():
     with open("run_meta.txt","a") as fh:
         fh.write(f"SLIPS_BUILT={len(slips_sorted)}\n")
         fh.write(f"SLIP_KEYS_METHOD={used}\n")
-        if slips_sorted:
-            fh.write(f"SLIP_EV_METHOD={slips_sorted[0]['ev_method']}\n")
+        fh.write(f"SLIP_EV_METHOD={(slips_sorted[0]['ev_method'] if slips_sorted else 'none')}\n")
         fh.write(f"SLIP_KEYS_OBSERVED={','.join(observed) if observed else 'NONE'}\n")
     print(f"SLIPS_BUILT={len(slips_sorted)}")
