@@ -116,6 +116,8 @@ jobs:
             data/pricefix_${{ env.DAY }}.json
             qa_stdout.log
             qa_stderr.log
+            alloc_slips.csv
+            slips.json
           if-no-files-found: warn
       - name: QA gate
         if: always()
