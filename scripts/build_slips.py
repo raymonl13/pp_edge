@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse, csv, itertools, json, math, os
+import argparse, csv, itertools, json
 from pathlib import Path
 from typing import Dict, Any, List, Tuple
 
@@ -11,13 +11,11 @@ def iso_day(day: str | None) -> str:
 
 def load_cfg(path: str) -> Dict[str, Any]:
     p=Path(path)
-    if not p.exists():
-        return {}
+    if not p.exists(): return {}
     try:
         import yaml
-        with p.open() as f:
-            d=yaml.safe_load(f) or {}
-            return d if isinstance(d,dict) else {}
+        with p.open() as f: d=yaml.safe_load(f) or {}
+        return d if isinstance(d,dict) else {}
     except Exception:
         return {}
 
@@ -41,7 +39,7 @@ def read_legs(csv_path: Path) -> List[Dict[str,Any]]:
 
 def choose_slip_sizes(payouts: Dict[str,Any]) -> Dict[str,int]:
     sizes={}
-    for k,v in payouts.items():
+    for k in payouts.keys():
         if k.startswith("Power"):
             try: sizes[k]=int(k.replace("Power",""))
             except: pass
@@ -50,12 +48,11 @@ def choose_slip_sizes(payouts: Dict[str,Any]) -> Dict[str,int]:
             except: pass
     return sizes
 
-def pick_slip_keys(payouts: Dict[str,Any], prefer: List[str], limit: int) -> List[str]:
+def pick_slip_keys_prefer(payouts: Dict[str,Any], prefer: List[str], limit: int) -> List[str]:
     keys=list(payouts.keys())
     ordered=[k for k in prefer if k in keys]
     rest=[k for k in keys if k not in ordered]
-    out=(ordered+rest)[:limit]
-    return out
+    return (ordered+rest)[:limit]
 
 def power_ev(ps: List[float], payout: float) -> float:
     prod=1.0
@@ -63,13 +60,10 @@ def power_ev(ps: List[float], payout: float) -> float:
     return prod*payout - 1.0
 
 def flex_ev(ps: List[float], payout_map: Dict[str,float]) -> float:
-    n=len(ps)
-    ev=0.0
+    n=len(ps); ev=0.0
     for h_s, mult in payout_map.items():
-        try:
-            h=int(h_s)
-        except:
-            continue
+        try: h=int(h_s)
+        except: continue
         if h<0 or h>n: continue
         s=0.0
         for combo in itertools.combinations(range(n), h):
@@ -96,8 +90,7 @@ def rank_legs(legs: List[Dict[str,Any]], max_pool: int) -> List[Dict[str,Any]]:
 
 def build_for_type(legs_by_type: List[Dict[str,Any]], size: int, slip_type: str, payouts: Dict[str,Any], max_slips: int) -> List[Dict[str,Any]]:
     legs=rank_legs(legs_by_type, max_pool=200)
-    out=[]
-    seen=set()
+    out=[]; seen=set()
     for combo in itertools.combinations(legs, size):
         players=[c["player"] for c in combo]
         games=[c["game_id"] for c in combo]
@@ -134,15 +127,26 @@ def main():
     max_types=int(slip_cfg.get("max_types",2))
     max_slips_per_type=int(slip_cfg.get("max_slips_per_type",5))
     sizes=choose_slip_sizes(payouts)
-    chosen=pick_slip_keys(payouts, prefer, max_types)
     legs=read_legs(csv_path)
     legs=[l for l in legs if 0.0<=l["p_hit"]<=1.0]
-    slips=[]
-    for st in chosen:
-        if st not in sizes: continue
-        size=sizes[st]
-        pool=[l for l in legs if l["slip_type"]==st]
-        slips.extend(build_for_type(pool, size, st, payouts, max_slips_per_type))
+    observed=list(dict.fromkeys([l["slip_type"] for l in legs]))
+    chosen=pick_slip_keys_prefer(payouts, prefer, max_types)
+    def build(chosen_types: List[str]) -> List[Dict[str,Any]]:
+        slips=[]
+        for st in chosen_types:
+            if st not in sizes: continue
+            size=sizes[st]
+            pool=[l for l in legs if l["slip_type"]==st]
+            if not pool: continue
+            slips.extend(build_for_type(pool, size, st, payouts, max_slips_per_type))
+        return slips
+    slips=build(chosen)
+    used="prefer"
+    if not slips and observed:
+        # fall back to observed slip types from the legs
+        obs=observed[:max_types]
+        slips=build(obs)
+        used="observed"
     slips_sorted=sorted(slips, key=lambda x: x["ev"], reverse=True)
     Path("slips.json").write_text(json.dumps({"day":day,"slips":slips_sorted}, separators=(",",":")))
     with open("alloc_slips.csv","w",newline="") as f:
@@ -151,9 +155,11 @@ def main():
         for s in slips_sorted:
             players="|".join([l["player"] for l in s["legs"]])
             games="|".join([l["game_id"] for l in s["legs"]])
-            w.writerow([s["slip_id"],s["slip_type"],s["size"],s["ev"],s["ev_method"],players,games])
+            w.writerow([s["slip_id"],s["slip_type"],s["size"],s["ev"],s["ev_method"],players, games])
     with open("run_meta.txt","a") as fh:
         fh.write(f"SLIPS_BUILT={len(slips_sorted)}\n")
+        fh.write(f"SLIP_KEYS_METHOD={used}\n")
         if slips_sorted:
             fh.write(f"SLIP_EV_METHOD={slips_sorted[0]['ev_method']}\n")
+        fh.write(f"SLIP_KEYS_OBSERVED={','.join(observed) if observed else 'NONE'}\n")
     print(f"SLIPS_BUILT={len(slips_sorted)}")
