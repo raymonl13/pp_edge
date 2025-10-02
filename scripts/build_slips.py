@@ -114,6 +114,7 @@ def main():
     csv_path=Path(f"edge_sheet_{day}.csv")
     if not csv_path.exists():
         with open("run_meta.txt","a") as fh:
+        fh.write(f"BUILDER_SIG={BUILDER_SIG}\n")
             fh.write("SLIPS_BUILT=0\n")
             fh.write("SLIP_KEYS_METHOD=none\n")
             fh.write("SLIP_EV_METHOD=none\n")
@@ -192,6 +193,7 @@ def main():
             w.writerow([s["slip_id"],s["slip_type"],s["size"],s["ev"],s["ev_method"],players, games])
 
     with open("run_meta.txt","a") as fh:
+        fh.write(f"BUILDER_SIG={BUILDER_SIG}\n")
         fh.write(f"SLIPS_BUILT={len(slips_sorted)}\n")
         method='fallback' if slips_sorted and selected and selected[0] not in prefer else ('prefer' if selected and selected[0] in prefer else ('observed' if selected else 'none'))
         fh.write(f"SLIP_KEYS_METHOD={method}\n")
