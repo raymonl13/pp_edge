@@ -125,6 +125,7 @@ jobs:
             slip_diag.txt
             slip_diag.json
             slips.json
+            slip_builder_debug.json
           if-no-files-found: warn
       - name: QA gate
         if: always()
