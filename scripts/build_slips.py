@@ -113,6 +113,14 @@ def main():
     ap.add_argument("--cfg", default="config_pp_edge_v6.8.yaml")
     args=ap.parse_args()
     day=iso_day(args.day)
+    # runtime provenance & trace
+    import hashlib,sys
+    try:
+        _sha=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:16]
+    except Exception:
+        _sha="unknown"
+    print(f"[builder] SIG={BUILDER_SIG} SHA={_sha} DAY={day}")
+
     csv_path=Path(f"edge_sheet_{day}.csv")
     if not csv_path.exists():
         with open("run_meta.txt","a") as fh:
@@ -147,7 +155,9 @@ def main():
 
     cand=list(dict.fromkeys(prefer + [t for t in observed if t not in prefer]))
     feasible=[t for t in cand if req_sizes.get(t,0)>0 and pool_sizes.get(t,0)>=req_sizes.get(t,0)]
+    print(f"[builder] observed={observed} feasible={feasible} prefer={prefer} cand={cand}")
     selected=feasible[:max_types]
+    print(f"[builder] selected_initial={selected}")
     skipped=[t for t in cand if t not in selected]
 
     slips=[]
@@ -159,6 +169,7 @@ def main():
 
     # Feasibility fallback: if nothing built, force first feasible observed type
     if not slips:
+        print("[builder] slips empty after initial selection; attempting observed feasibility fallback")
         obs_feasible=[t for t in observed if req_sizes.get(t,0)>0 and pool_sizes.get(t,0)>=req_sizes.get(t,0)]
         if obs_feasible:
             fb=obs_feasible[0]
@@ -187,6 +198,7 @@ def main():
         "slips_built": len(slips_sorted)
     }
     Path("slip_builder_debug.json").write_text(json.dumps(debug, indent=2))
+    print("[builder] wrote slip_builder_debug.json")
 
     Path("slips.json").write_text(json.dumps({"day":day,"slips":slips_sorted}, separators=(",",":")))
     with open("alloc_slips.csv","w",newline="") as f:
