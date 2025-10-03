@@ -10,6 +10,12 @@ except Exception:
     ZoneInfo = None
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 
+import warnings
+warnings.filterwarnings("ignore", module="requests")
+warnings.filterwarnings("ignore", module="urllib3")
+warnings.filterwarnings("ignore", module="idna")
+warnings.filterwarnings("ignore", module="charset_normalizer")
+warnings.filterwarnings("ignore", module="yaml")
 import requests, yaml
 
 def _now_pt() -> datetime:

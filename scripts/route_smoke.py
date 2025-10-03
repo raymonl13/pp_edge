@@ -7,6 +7,12 @@ try:
     from zoneinfo import ZoneInfo
 except Exception:
     ZoneInfo = None
+import warnings
+warnings.filterwarnings("ignore", module="requests")
+warnings.filterwarnings("ignore", module="urllib3")
+warnings.filterwarnings("ignore", module="idna")
+warnings.filterwarnings("ignore", module="charset_normalizer")
+warnings.filterwarnings("ignore", module="yaml")
 import requests, yaml
 
 def _iso_day(s: str|None) -> str:
