@@ -55,6 +55,7 @@ jobs:
           test -s "data/pricefix_${DAY}.json" || printf '{}' > "data/pricefix_${DAY}.json"
 
       - name: Show router provenance
+        continue-on-error: true
         if: always()
         run: |
           set -euo pipefail
@@ -67,6 +68,7 @@ jobs:
           print('\n'.join(p.read_text().splitlines()[:30]) if p.exists() else 'missing')
           PPY
       - name: Route fetch (Session 7)
+        if: always()
         env:
           ROUTER_API_KEY: ${{ secrets.ROUTER_API_KEY }}
         run: |
