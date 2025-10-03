@@ -58,6 +58,24 @@ jobs:
         run: python3 scripts/score_board.py "$DAY" --cfg config_pp_edge_v6.8.yaml
       - name: Diagnose slips
         run: python3 scripts/diagnose_slips.py "$DAY" --cfg config_pp_edge_v6.8.yaml
+      - name: Show builder provenance
+        if: always()
+        run: |
+          set -euo pipefail
+          echo '=== BUILDER PROVENANCE ==='
+          python3 - <<'PPY'
+          from pathlib import Path
+          p=Path('scripts/build_slips.py'); s=p.read_text()
+          sig='unknown'
+          for ln in s.splitlines():
+              if ln.startswith('BUILDER_SIG') and '=' in ln:
+                  sig=ln.split('=',1)[1].strip().strip('"\'')
+                  break
+          import hashlib; h=hashlib.sha256(p.read_bytes()).hexdigest()[:16]
+          print('BUILDER_SIG='+sig)
+          print('BUILDER_SHA256='+h)
+          PPY
+          echo '--- scripts/build_slips.py (head) ---'; head -n 40 scripts/build_slips.py || true
       - name: Build slips
         run: |
           set -xeuo pipefail
