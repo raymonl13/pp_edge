@@ -227,3 +227,6 @@ def main():
         fh.write(f"BUILDER_SIG={BUILDER_SIG}\n")
 
     print(f"SLIPS_BUILT={len(slips_sorted)}")
+
+if __name__ == "__main__":
+    main()
