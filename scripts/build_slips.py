@@ -4,6 +4,8 @@ import argparse, csv, itertools, json
 from pathlib import Path
 from typing import Dict, Any, List, Tuple
 
+BUILDER_SIG = "v6.2-players-only-feas-fallback"
+
 def iso_day(day: str | None) -> str:
     if day: return day
     import datetime
@@ -114,11 +116,11 @@ def main():
     csv_path=Path(f"edge_sheet_{day}.csv")
     if not csv_path.exists():
         with open("run_meta.txt","a") as fh:
-        fh.write(f"BUILDER_SIG={BUILDER_SIG}\n")
             fh.write("SLIPS_BUILT=0\n")
             fh.write("SLIP_KEYS_METHOD=none\n")
             fh.write("SLIP_EV_METHOD=none\n")
             fh.write("SLIP_KEYS_OBSERVED=NONE\n")
+            fh.write(f"BUILDER_SIG={BUILDER_SIG}\n")
         print("SLIPS_BUILT=0"); return
 
     cfg=load_cfg(args.cfg)
@@ -138,7 +140,8 @@ def main():
         if st not in seen:
             observed.append(st); seen.add(st)
 
-    pools={t:[l for l in legs if l["slip_type"]==t] for t in set(observed + list(payouts.keys()))}
+    all_types=set(observed + list(payouts.keys()))
+    pools={t:[l for l in legs if l["slip_type"]==t] for t in all_types}
     pool_sizes={t:len(pools[t]) for t in pools}
     req_sizes={t:sizes.get(t,0) for t in pools}
 
@@ -154,7 +157,7 @@ def main():
         if size and len(pool)>=size:
             slips.extend(build_for_type(pool, size, st, payouts, max_slips_per_type))
 
-    # feasibility fallback: if nothing built, force first feasible observed type
+    # Feasibility fallback: if nothing built, force first feasible observed type
     if not slips:
         obs_feasible=[t for t in observed if req_sizes.get(t,0)>0 and pool_sizes.get(t,0)>=req_sizes.get(t,0)]
         if obs_feasible:
@@ -165,11 +168,13 @@ def main():
                 slips.extend(build_for_type(pool, size, fb, payouts, max_slips=1))
                 selected=[fb]
                 skipped=[t for t in cand if t!=fb]
-                prefer=[]  # method → 'fallback'
+                prefer=[]  # report method as 'observed' for fallback
 
     slips_sorted=sorted(slips, key=lambda x: x["ev"], reverse=True)
 
+    # Always write builder debug
     debug={
+        "sig": BUILDER_SIG,
         "day": day,
         "prefer": prefer,
         "observed": observed,
@@ -193,9 +198,8 @@ def main():
             w.writerow([s["slip_id"],s["slip_type"],s["size"],s["ev"],s["ev_method"],players, games])
 
     with open("run_meta.txt","a") as fh:
-        fh.write(f"BUILDER_SIG={BUILDER_SIG}\n")
         fh.write(f"SLIPS_BUILT={len(slips_sorted)}\n")
-        method='fallback' if slips_sorted and selected and selected[0] not in prefer else ('prefer' if selected and selected[0] in prefer else ('observed' if selected else 'none'))
+        method='fallback' if (slips_sorted and selected and selected[0] not in prefer) else ('prefer' if (selected and selected[0] in prefer) else ('observed' if selected else 'none'))
         fh.write(f"SLIP_KEYS_METHOD={method}\n")
         fh.write(f"SLIP_EV_METHOD={(slips_sorted[0]['ev_method'] if slips_sorted else 'none')}\n")
         fh.write(f"SLIP_KEYS_OBSERVED={','.join(observed) if observed else 'NONE'}\n")
@@ -208,5 +212,6 @@ def main():
                 elif ps<rs: reasons.append(f"{t}:pool{ps}<{rs}")
                 else: reasons.append(f"{t}:deprioritized")
             fh.write("SLIP_KEYS_SKIPPED="+";".join(reasons)+"\n")
+        fh.write(f"BUILDER_SIG={BUILDER_SIG}\n")
 
     print(f"SLIPS_BUILT={len(slips_sorted)}")
