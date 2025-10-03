@@ -76,3 +76,13 @@ slips:
   max_slips_per_type: 3
   max_types: 1
   slip_types: ["Power4"]
+
+stakes:
+  explore_top_k: 1
+  explore_stake: 1.0
+  max_slips: 2
+  ev_floor: -1.00
+  min_per_slip: 1.0
+  max_per_slip: 1.0
+  per_day_cap: 3.0
+  method: kelly_combo
