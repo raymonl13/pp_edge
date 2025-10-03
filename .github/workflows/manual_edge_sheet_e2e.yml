@@ -59,7 +59,17 @@ jobs:
       - name: Diagnose slips
         run: python3 scripts/diagnose_slips.py "$DAY" --cfg config_pp_edge_v6.8.yaml
       - name: Build slips
-        run: python3 scripts/build_slips.py "$DAY" --cfg config_pp_edge_v6.8.yaml
+        run: |
+          set -xeuo pipefail
+          echo "=== BUILD SLIPS ENV ==="
+          echo "PYTHON: $(python3 -V)"
+          echo "DAY=${DAY:-}"
+          ls -l || true
+          if [ -z "${DAY:-}" ]; then DAY="$(date -u +%F)"; fi
+          ES="edge_sheet_${DAY}.csv"; echo "--- HEAD of $ES ---"; head -n 6 "$ES" 2>/dev/null || echo "missing $ES"
+          export PYTHONFAULTHANDLER=1
+          python3 -X dev -W error scripts/build_slips.py "$DAY" --cfg config_pp_edge_v6.8.yaml 1>builder_stdout.log 2>builder_stderr.log
+          rc=$?; echo "BUILD_SLIPS_RC=$rc" | tee -a run_meta.txt; test $rc -eq 0
       - name: Ensure CSV exists (guard)
         run: |
           test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
@@ -106,6 +116,7 @@ jobs:
           [ -f slips.json ] || printf '{"day":"%s","slips":[]}\n' "$(date -u +%F)" > slips.json
           [ -f alloc_slips.csv ] || printf 'slip_id,slip_type,size,ev,ev_method,players,games\n' > alloc_slips.csv
       - name: Ensure slip meta
+        if: always()
         run: python3 scripts/ensure_slip_meta.py
       - name: Run debug report
         run: python3 scripts/run_debug_report.py
@@ -128,6 +139,10 @@ jobs:
             slip_diag.json
             slips.json
             slip_builder_debug.json
+            builder_stdout.log
+            builder_stderr.log
+            run_debug.txt
+            run_debug.json
           if-no-files-found: warn
       - name: QA gate
         if: always()
