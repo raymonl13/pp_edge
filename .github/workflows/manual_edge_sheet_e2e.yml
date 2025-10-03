@@ -88,6 +88,9 @@ jobs:
           export PYTHONFAULTHANDLER=1
           python3 -X dev -W error scripts/build_slips.py "$DAY" --cfg config_pp_edge_v6.8.yaml 1>builder_stdout.log 2>builder_stderr.log
           rc=$?; echo "BUILD_SLIPS_RC=$rc" | tee -a run_meta.txt; test $rc -eq 0
+      - name: Allocate stakes
+        if: always()
+        run: python3 scripts/allocate_stakes.py "$DAY" --cfg config_pp_edge_v6.8.yaml
       - name: Ensure CSV exists (guard)
         run: |
           test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
@@ -159,6 +162,7 @@ jobs:
             slip_builder_debug.json
             builder_stdout.log
             builder_stderr.log
+            alloc_slips_with_stakes.csv
             run_debug.txt
             run_debug.json
           if-no-files-found: warn
