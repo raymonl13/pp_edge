@@ -54,6 +54,33 @@ jobs:
           mkdir -p data
           test -s "data/pricefix_${DAY}.json" || printf '{}' > "data/pricefix_${DAY}.json"
 
+      - name: Show router provenance
+        if: always()
+        run: |
+          set -euo pipefail
+          python3 - <<'PPY'
+          from pathlib import Path, hashlib
+          p=Path('scripts/route_fetch.py')
+          sha=hashlib.sha256(p.read_bytes()).hexdigest()[:16] if p.exists() else 'missing'
+          print('ROUTER_SIG='+sha)
+          print('--- head scripts/route_fetch.py ---')
+          print('\n'.join(p.read_text().splitlines()[:30]) if p.exists() else 'missing')
+          PPY
+      - name: Route fetch (Session 7)
+        env:
+          ROUTER_API_KEY: ${{ secrets.ROUTER_API_KEY }}
+        run: |
+          set -xeuo pipefail
+          mkdir -p data/logs
+          export PYTHONFAULTHANDLER=1
+          python -X dev -W error scripts/route_smoke.py || true
+          python -X dev -W error scripts/route_fetch.py 1>data/logs/router_stdout.log 2>data/logs/router_stderr.log
+      - name: Merge router summary into run_debug
+        if: always()
+        run: |
+          set -euo pipefail
+          cp data/logs/route_debug.json run_debug_router.json || true
+          cat data/logs/router_summary.txt >> run_debug.txt 2>/dev/null || true
       - name: Score board
         run: python3 scripts/score_board.py "$DAY" --cfg config_pp_edge_v6.8.yaml
       - name: Diagnose slips

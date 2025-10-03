@@ -2,17 +2,14 @@
 from __future__ import annotations
 from pathlib import Path
 import re
-
 wf=Path(".github/workflows/manual_edge_sheet_e2e.yml")
 txt=wf.read_text()
 lines=txt.splitlines()
 idxs=[i for i,l in enumerate(lines) if re.match(r'^\s*-\s*name:\s*',l)]
 target=None
 for i in idxs:
-    if re.search(r'^\s*-\s*name:\s*Emit CSV from board\s*$', lines[i]):
-        target=i; break
-if target is None:
-    print("step not found: Emit CSV from board"); raise SystemExit(0)
+    if re.search(r'^\s*-\s*name:\s*Emit CSV from board\s*$', lines[i]): target=i; break
+if target is None: print("step not found: Emit CSV from board"); raise SystemExit(0)
 end=next((j for j in idxs if j>target), len(lines))
 name_indent=re.match(r'^(\s*)', lines[target]).group(1)
 lines[target]=f"{name_indent}- name: Score board"
