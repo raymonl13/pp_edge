@@ -71,19 +71,23 @@ jobs:
         if: always()
         env:
           ROUTER_API_KEY: ${{ secrets.ROUTER_API_KEY }}
-        shell: bash
-        shell: bash
         run: |
+          # shellcheck disable=SC2016
           set -xeuo pipefail
-          mkdir -p data/logs
+          DAY="${{ steps.day.outputs.day }}"
           PY="$(command -v python || command -v python3)"
-          echo "PY=$PY"
-          echo "DAY=${ steps.day.outputs.day }"
-          if [ -n "${ secrets.ROUTER_API_KEY }" ]; then echo 'API key present (redacted)'; else echo 'API key missing'; fi
+          echo "PY=${PY}"
+          echo "DAY=${DAY}"
+          if [ -n "${{ secrets.ROUTER_API_KEY }}" ]; then echo "API key present (redacted)"; else echo "API key missing"; fi
+          mkdir -p data/logs
           export PYTHONFAULTHANDLER=1
-          "$PY" -X dev -W error scripts/route_smoke.py --date "${ steps.day.outputs.day }" || true
-          "$PY" -X dev -W error scripts/route_fetch.py --date "${ steps.day.outputs.day }" 1>data/logs/router_stdout.log 2>data/logs/router_stderr.log || { echo "::error ::route_fetch failed"; tail -n 160 data/logs/router_stderr.log 2>/dev/null || true; exit 1; }
-          test -s "data/pricefix_${ steps.day.outputs.day }.json"
+          "$PY" -X dev -W error scripts/route_smoke.py --date "$DAY" || true
+          "$PY" -X dev -W error scripts/route_fetch.py --date "$DAY" 1>data/logs/router_stdout.log 2>data/logs/router_stderr.log || {
+            echo "::error ::route_fetch failed"
+            tail -n 160 data/logs/router_stderr.log 2>/dev/null || true
+            exit 1
+          }
+          test -s "data/pricefix_${DAY}.json"
       - name: Merge router summary into run_debug
         if: always()
         run: |
@@ -92,10 +96,14 @@ jobs:
           cat data/logs/router_summary.txt >> run_debug.txt 2>/dev/null || true
       - name: Python env diag
         if: always()
+        continue-on-error: true
         run: |
-          python -c 'import sys,platform;print(sys.version);print(platform.platform())'
-          python -c 'import requests,yaml;print("requests=",requests.__version__);print("pyyaml=",yaml.__version__)'
-          ls -la scripts | sed -n '1,80p'
+          set -euo pipefail
+          PY="$(command -v python || command -v python3)"
+          echo "PY=${PY}"
+          "$PY" -c "import sys,platform;print(sys.version);print(platform.platform())"
+          "$PY" -c "import requests,yaml;print('requests=',requests.__version__);print('pyyaml=',yaml.__version__)"
+          ls -la scripts | sed -n 1,80p
       - name: Score board
         run: python3 scripts/score_board.py "$DAY" --cfg config_pp_edge_v6.8.yaml
       - name: Diagnose slips
