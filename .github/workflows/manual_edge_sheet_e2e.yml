@@ -72,14 +72,18 @@ jobs:
         env:
           ROUTER_API_KEY: ${{ secrets.ROUTER_API_KEY }}
         shell: bash
+        shell: bash
         run: |
           set -xeuo pipefail
           mkdir -p data/logs
+          PY="$(command -v python || command -v python3)"
+          echo "PY=$PY"
           echo "DAY=${ steps.day.outputs.day }"
           if [ -n "${ secrets.ROUTER_API_KEY }" ]; then echo 'API key present (redacted)'; else echo 'API key missing'; fi
           export PYTHONFAULTHANDLER=1
-          python -X dev -W error scripts/route_smoke.py --date "${ steps.day.outputs.day }" || true
-          python -X dev -W error scripts/route_fetch.py --date "${ steps.day.outputs.day }" 1>data/logs/router_stdout.log 2>data/logs/router_stderr.log
+          "$PY" -X dev -W error scripts/route_smoke.py --date "${ steps.day.outputs.day }" || true
+          "$PY" -X dev -W error scripts/route_fetch.py --date "${ steps.day.outputs.day }" 1>data/logs/router_stdout.log 2>data/logs/router_stderr.log || { echo "::error ::route_fetch failed"; tail -n 160 data/logs/router_stderr.log 2>/dev/null || true; exit 1; }
+          test -s "data/pricefix_${ steps.day.outputs.day }.json"
       - name: Merge router summary into run_debug
         if: always()
         run: |
