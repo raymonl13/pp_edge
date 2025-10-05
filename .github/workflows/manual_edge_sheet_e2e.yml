@@ -83,6 +83,12 @@ jobs:
           set -euo pipefail
           cp data/logs/route_debug.json run_debug_router.json || true
           cat data/logs/router_summary.txt >> run_debug.txt 2>/dev/null || true
+      - name: Python env diag
+        if: always()
+        run: |
+          python -c 'import sys,platform;print(sys.version);print(platform.platform())'
+          python -c 'import requests,yaml;print("requests=",requests.__version__);print("pyyaml=",yaml.__version__)'
+          ls -la scripts | sed -n '1,80p'
       - name: Score board
         run: python3 scripts/score_board.py "$DAY" --cfg config_pp_edge_v6.8.yaml
       - name: Diagnose slips
