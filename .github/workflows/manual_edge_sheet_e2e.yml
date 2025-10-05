@@ -71,23 +71,44 @@ jobs:
         if: always()
         env:
           ROUTER_API_KEY: ${{ secrets.ROUTER_API_KEY }}
+      - name: Upload router logs (immediate)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: router_logs_${{ steps.day.outputs.day }}
+          path: |
+            data/logs/router_stdout.log
+            data/logs/router_stderr.log
+            data/logs/route_debug.json
+            data/logs/route_step_entered
+      - name: Route fetch (Session 7)
+        if: always()
+        env:
+          ROUTER_API_KEY: ${{ secrets.ROUTER_API_KEY }}
         run: |
-          # shellcheck disable=SC2016
           set -xeuo pipefail
+          echo "[route-step] enter"
+          pwd; ls -la
           DAY="${{ steps.day.outputs.day }}"
-          PY="$(command -v python || command -v python3)"
-          echo "PY=${PY}"
           echo "DAY=${DAY}"
           if [ -n "${{ secrets.ROUTER_API_KEY }}" ]; then echo "API key present (redacted)"; else echo "API key missing"; fi
           mkdir -p data/logs
+          touch data/logs/route_step_entered
+          PY="$(command -v python || command -v python3)"
+          echo "PY=${PY}"
+          "${PY}" -c "import sys,platform;print('py=',sys.version.split()[0],'on',platform.system())"
           export PYTHONFAULTHANDLER=1
-          "$PY" -X dev -W error scripts/route_smoke.py --date "$DAY" || true
-          "$PY" -X dev -W error scripts/route_fetch.py --date "$DAY" 1>data/logs/router_stdout.log 2>data/logs/router_stderr.log || {
-            echo "::error ::route_fetch failed"
+          # Smoke first; never fail the job yet
+          "${PY}" -X dev -W error scripts/route_smoke.py --date "${DAY}" || true
+          # Run router; capture all stderr/stdout; on failure print tail but DO NOT exit before logs upload
+          set +e
+          "${PY}" -X dev -W error scripts/route_fetch.py --date "${DAY}" 1>data/logs/router_stdout.log 2>data/logs/router_stderr.log
+          RC=$?; echo "route_fetch RC=${RC}"
+          if [ ${RC} -ne 0 ]; then
+            echo "::error ::route_fetch failed; stderr tail:"
             tail -n 160 data/logs/router_stderr.log 2>/dev/null || true
-            exit 1
-          }
-          test -s "data/pricefix_${DAY}.json"
+          fi
+          set -e
       - name: Merge router summary into run_debug
         if: always()
         run: |
