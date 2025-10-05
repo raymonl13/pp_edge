@@ -67,6 +67,12 @@ jobs:
           print('--- head scripts/route_fetch.py ---')
           print('\n'.join(p.read_text().splitlines()[:30]) if p.exists() else 'missing')
           PPY
+      - name: Init router logs dir
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p data/logs
+          date +%s > data/logs/ci_probe.txt
       - name: Route fetch (Session 7)
         if: always()
         continue-on-error: true
@@ -91,14 +97,17 @@ jobs:
           set -e
       - name: Upload router logs (immediate)
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: router_logs
+          if-no-files-found: warn
           path: |
             data/logs/router_stdout.log
             data/logs/router_stderr.log
             data/logs/route_debug.json
             data/logs/route_step_entered
+            data/logs/ci_probe.txt
       - name: Upload router logs (immediate)
         if: always()
         uses: actions/upload-artifact@v4
