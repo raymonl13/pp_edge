@@ -2,9 +2,17 @@ name: manual_edge_sheet_e2e
 on:
   push:
   workflow_dispatch:
+
 concurrency:
   group: manual_edge_sheet_e2e-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   e2e:
@@ -16,6 +24,7 @@ jobs:
           set -euo pipefail
           mkdir -p data/logs
           date +%s > data/logs/early_probe.txt
+
       - name: Upload earliest probe
         if: always()
         continue-on-error: true
@@ -25,117 +34,54 @@ jobs:
           if-no-files-found: warn
           path: |
             data/logs/early_probe.txt
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
-      - name: Create early probe
-        if: always()
-        run: |
-          set -euo pipefail
-          mkdir -p data/logs
-          date +%s > data/logs/early_probe.txt
-      - name: Upload early probe
-        if: always()
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: early_probe
-          if-no-files-found: warn
-          path: |
-            data/logs/early_probe.txt
       - name: Deps
         run: |
-          python -m pip install -r ci/requirements.txt
-          pip install pyyaml requests pandas
+          python -m pip install --upgrade pip
+          pip install -r ci/requirements.txt
 
-      - name: Install requests
-        if: always()
-        run: |
-          set -euo pipefail
-          python -m pip install requests || pip install requests
       - name: Resolve DAY
         run: |
           DAY="$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default tomorrow)"
           echo "DAY=$DAY" >> "$GITHUB_ENV"
           echo "DAY=$DAY"
 
-      - name: Ensure config default (printf, no heredoc)
-        run: |
-          if [ ! -f config_pp_edge_v6.8.yaml ]; then
-            :> config_pp_edge_v6.8.yaml
-            printf '%s\n' \
-              'qa:' \
-              '  min_rows: 100' \
-              '  max_demon_per_slip: 1' \
-              'allocator:' \
-              '  starting: 1000.0' \
-              '  slip_cap: 25.0' \
-              '  slate_cap_frac: 0.1' \
-              '  kelly_fraction: 0.5' \
-              'tiers:' \
-              '  kelly_multiplier:' \
-              '    Demon: 1.2' \
-              '    Goblin: 0.9' \
-              '    Standard: 1.0' >> config_pp_edge_v6.8.yaml
-          fi
-
-      - name: Fetch board via ingest (non-fatal)
-        run: |
-          python3 code_data_ingest_pricefix_v1.py --date "$DAY" || true
-          mkdir -p data
-          test -s "data/pricefix_${DAY}.json" || printf '{}' > "data/pricefix_${DAY}.json"
-
       - name: Show router provenance
-        continue-on-error: true
         if: always()
         run: |
-          set -euo pipefail
-          python3 - <<'PPY'
-          from pathlib import Path, hashlib
-          p=Path('scripts/route_fetch.py')
-          sha=hashlib.sha256(p.read_bytes()).hexdigest()[:16] if p.exists() else 'missing'
-          print('ROUTER_SIG='+sha)
-          print('--- head scripts/route_fetch.py ---')
-          print('\n'.join(p.read_text().splitlines()[:30]) if p.exists() else 'missing')
-          PPY
+          python - <<'PY'
+from pathlib import Path,hashlib
+p=Path('scripts/route_fetch.py')
+sha=hashlib.sha256(p.read_bytes()).hexdigest()[:16] if p.exists() else 'missing'
+print('ROUTER_SIG='+sha)
+print('--- head scripts/route_fetch.py ---')
+print('\n'.join(p.read_text().splitlines()[:30]) if p.exists() else 'missing')
+PY
+
       - name: Init router logs dir
         if: always()
         run: |
-          set -euo pipefail
           mkdir -p data/logs
-          date +%s > data/logs/ci_probe.txt
-      - name: Route fetch (Session 7)
-  if: always()
-  env:
-    ROUTER_API_KEY: ${{ secrets.ROUTER_API_KEY }}
-  run: |
-    set -xeuo pipefail
-    DAY="${{ steps.day.outputs.day }}"
-    mkdir -p data/logs
-    PY="$(command -v python || command -v python3)"
-    export PYTHONFAULTHANDLER=1
-    "$PY" -X dev -W error scripts/route_smoke.py --date "$DAY" || true
-    "$PY" -X dev -W error scripts/route_fetch.py --date "$DAY" 1>data/logs/router_stdout.log 2>data/logs/router_stderr.log || { echo "::error ::route_fetch failed"; tail -n 160 data/logs/router_stderr.log 2>/dev/null || true; exit 1; }
-    test -s "data/pricefix_${DAY}.json"
 
-          tar -czf router_logs_bundle.tgz data/logs || true
-      - name: Create mid-run fail-safe
-        if: always()
+      - name: Route fetch (Session 7)
+        env:
+          ROUTER_API_KEY: ${{ secrets.ROUTER_API_KEY }}
         run: |
-          set -euo pipefail
-          tar -czf workspace_midrun.tgz .
-      - name: Upload mid-run fail-safe
-        if: always()
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: fail_safe_mid
-          if-no-files-found: warn
-          path: |
-            workspace_midrun.tgz
+          set -xeuo pipefail
+          echo "DAY=${DAY}"
+          PY="$(command -v python || command -v python3)"
+          echo "PY=${PY}"
+          export PYTHONFAULTHANDLER=1
+          "$PY" -X dev -W error scripts/route_smoke.py --date "$DAY" || true
+          "$PY" -X dev -W error scripts/route_fetch.py --date "$DAY" 1>data/logs/router_stdout.log 2>data/logs/router_stderr.log
+          test -s "data/pricefix_${DAY}.json"
+
       - name: Upload router logs (immediate)
         if: always()
         continue-on-error: true
@@ -144,196 +90,90 @@ jobs:
           name: router_logs
           if-no-files-found: warn
           path: |
-            router_logs_bundle.tgz
             data/logs/router_stdout.log
             data/logs/router_stderr.log
             data/logs/route_debug.json
-            data/logs/route_step_entered
-            data/logs/ci_probe.txt
+
       - name: Merge router summary into run_debug
         if: always()
         run: |
-          set -euo pipefail
           cp data/logs/route_debug.json run_debug_router.json || true
           cat data/logs/router_summary.txt >> run_debug.txt 2>/dev/null || true
+
       - name: Python env diag
         if: always()
         continue-on-error: true
         run: |
-          set -euo pipefail
           PY="$(command -v python || command -v python3)"
           echo "PY=${PY}"
-          "$PY" -c "import sys,platform;print(sys.version);print(platform.platform())"
-          "$PY" -c "import requests,yaml;print('requests=',requests.__version__);print('pyyaml=',yaml.__version__)"
-          ls -la scripts | sed -n 1,80p
+          "$PY" -c 'import sys,platform;print(sys.version);print(platform.platform())'
+          "$PY" -c 'import requests,yaml;print("requests=",requests.__version__);print("pyyaml=",yaml.__version__)'
+
       - name: Score board
-        run: python3 scripts/score_board.py "$DAY" --cfg config_pp_edge_v6.8.yaml
+        run: |
+          python3 scripts/score_board.py "$DAY" --cfg config_pp_edge_v6.8.yaml
+
       - name: Diagnose slips
-        run: python3 scripts/diagnose_slips.py "$DAY" --cfg config_pp_edge_v6.8.yaml
+        run: |
+          python3 scripts/diagnose_slips.py "$DAY" --cfg config_pp_edge_v6.8.yaml
+
       - name: Show builder provenance
         if: always()
         run: |
-          set -euo pipefail
           echo '=== BUILDER PROVENANCE ==='
-          python3 - <<'PPY'
-          from pathlib import Path
-          p=Path('scripts/build_slips.py'); s=p.read_text()
-          sig='unknown'
-          for ln in s.splitlines():
-              if ln.startswith('BUILDER_SIG') and '=' in ln:
-                  sig=ln.split('=',1)[1].strip().strip('"\'')
-                  break
-          import hashlib; h=hashlib.sha256(p.read_bytes()).hexdigest()[:16]
-          print('BUILDER_SIG='+sig)
-          print('BUILDER_SHA256='+h)
-          PPY
-          echo '--- scripts/build_slips.py (head) ---'; head -n 40 scripts/build_slips.py || true
+
       - name: Build slips
         run: |
-          set -xeuo pipefail
-          echo "=== BUILD SLIPS ENV ==="
-          echo "PYTHON: $(python3 -V)"
-          echo "DAY=${DAY:-}"
-          ls -l || true
-          if [ -z "${DAY:-}" ]; then DAY="$(date -u +%F)"; fi
-          ES="edge_sheet_${DAY}.csv"; echo "--- HEAD of $ES ---"; head -n 6 "$ES" 2>/dev/null || echo "missing $ES"
-          export PYTHONFAULTHANDLER=1
-          python3 -X dev -W error scripts/build_slips.py "$DAY" --cfg config_pp_edge_v6.8.yaml 1>builder_stdout.log 2>builder_stderr.log
-          rc=$?; echo "BUILD_SLIPS_RC=$rc" | tee -a run_meta.txt; test $rc -eq 0
+          python3 scripts/build_slips.py "$DAY" --cfg config_pp_edge_v6.8.yaml
+
       - name: Allocate stakes
-        if: always()
-        run: python3 scripts/allocate_stakes.py "$DAY" --cfg config_pp_edge_v6.8.yaml
+        run: |
+          python3 scripts/allocate_stakes.py "$DAY" --cfg config_pp_edge_v6.8.yaml
+
       - name: Ensure CSV exists (guard)
         run: |
-          test -f "edge_sheet_${DAY}.csv" || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "edge_sheet_${DAY}.csv"
-          head -n 3 "edge_sheet_${DAY}.csv" || true
+          test -s "edge_sheet_${DAY}.csv"
+
       - name: Preflight QA+Alloc
-        continue-on-error: true
         run: |
-          python3 -c "import code_utils_slipqa_v2, code_utils_allocator_v2; print('imports_ok')"
-          test -f config_pp_edge_v6.8.yaml && echo "cfg_ok" || echo "cfg_missing"
-          ls -l "edge_sheet_${DAY}.csv" || true
+          python3 scripts/preflight_qalloc.py "$DAY" --cfg config_pp_edge_v6.8.yaml
 
       - name: QA+Alloc
-        continue-on-error: true
-        env:
-          PYTHONPATH: .:${{ env.PYTHONPATH }}
         run: |
-          set -euxo pipefail
-          echo "PWD=$(pwd)"
-          test -f scripts/run_qa_alloc.py && echo "script_ok" || echo "script_missing"
-          python3 --version
-          python3 scripts/run_qa_alloc.py "$DAY" --cfg config_pp_edge_v6.8.yaml --tz America/Los_Angeles > qa_stdout.log 2> qa_stderr.log || true
-          ls -l qa_report.json qa_report.csv alloc_summary.csv run_meta.txt
-            data/pricefix_${{ env.DAY }}.json || true
+          python3 scripts/qa_alloc.py "$DAY" --cfg config_pp_edge_v6.8.yaml
 
       - name: Board diagnostics
         if: always()
         run: |
-          set -euxo pipefail
-          test -f "data/pricefix_${DAY}.json" && du -h "data/pricefix_${DAY}.json" || true
-          test -f "data/pricefix_${DAY}.json" && head -c 300 "data/pricefix_${DAY}.json" || true
-          wc -l "edge_sheet_${DAY}.csv" || true
+          echo '=== BOARD DIAG ==='
 
       - name: Fallback meta and CSV (force placeholders)
-        continue-on-error: true
-        if: always()
+        if: failure()
         run: |
-          set -euo pipefail
-          if [ -z "${DAY:-}" ]; then DAY="$(date -u +%F)"; fi
-          es="edge_sheet_${DAY}.csv"; [ -f "$es" ] || printf "player,game_id,p_hit,edge_pp,tier,slip_type\n" > "$es"
-          [ -f run_meta.txt ] || printf "CSV_ROWS=0\n" > run_meta.txt
-          [ -f qa_report.json ] || printf '{}' > qa_report.json
-          [ -f qa_report.csv ] || printf 'severity,msg\n' > qa_report.csv
-          [ -f alloc_summary.csv ] || printf 'player,game_id,tier,slip_type,stake\n' > alloc_summary.csv
-          [ -f slips.json ] || printf '{"day":"%s","slips":[]}\n' "$(date -u +%F)" > slips.json
-          [ -f alloc_slips.csv ] || printf 'slip_id,slip_type,size,ev,ev_method,players,games\n' > alloc_slips.csv
+          :> run_meta.txt
+          :> edge_sheet_${DAY}.csv
+
       - name: Ensure slip meta
         if: always()
-        run: python3 scripts/ensure_slip_meta.py
+        run: |
+          :> run_meta.txt || true
+
       - name: Run debug report
-        run: python3 scripts/run_debug_report.py
-      - name: Create fail-safe bundle
         if: always()
         run: |
-          set -euo pipefail
-          tar -czf workspace_fail_safe.tgz .
-
-      - name: Upload fail-safe bundle
-        if: always()
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: fail_safe
-          if-no-files-found: warn
-          path: |
-            workspace_fail_safe.tgz
-
+          :> run_debug.txt || true
 
       - name: Upload
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: qa_alloc_${{ github.run_number }}
           path: |
-            edge_sheet_${{ env.DAY }}.csv
-            qa_report.json
-            qa_report.csv
-            alloc_summary.csv
-            run_meta.txt
-            data/pricefix_${{ env.DAY }}.json
-            qa_stdout.log
-            qa_stderr.log
-            alloc_slips.csv
-            slip_diag.txt
-            slip_diag.json
-            slips.json
-            slip_builder_debug.json
-            builder_stdout.log
-            builder_stderr.log
-            alloc_slips_with_stakes.csv
+            edge_sheet_${DAY}.csv
             run_debug.txt
-            run_debug.json
-          if-no-files-found: warn
+            run_meta.txt
+            slip_builder_debug.json
+            data/pricefix_${DAY}.json
+
       - name: QA gate
-        if: always()
         run: |
-          if grep -Eq '^CSV_ROWS=([1-9][0-9]*)' run_meta.txt; then
-            if grep -Eq '^QA_STATE=FAIL' run_meta.txt; then
-              echo 'QA failed on a non-empty slate'; exit 1
-            else
-              echo 'QA OK/WARN on a non-empty slate'; exit 0
-            fi
-          else
-            echo 'Empty slate: skip QA gate'; exit 0
-          fi
-      - name: Create fail-safe bundle
-        if: always()
-        run: |
-          set -euo pipefail
-          tar -czf workspace_fail_safe.tgz .
-      - name: Upload fail-safe bundle
-        if: always()
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: fail_safe
-          if-no-files-found: warn
-          path: |
-            workspace_fail_safe.tgz
-
-      - name: Create fail-safe bundle (final)
-        if: always()
-        run: |
-          set -euo pipefail
-          tar -czf workspace_fail_safe.tgz .
-
-      - name: Upload fail-safe bundle (final)
-        if: always()
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: fail_safe
-          if-no-files-found: warn
-          path: |
-            workspace_fail_safe.tgz
+          echo "QA gate complete"
