@@ -89,6 +89,7 @@ jobs:
           mkdir -p data/logs
           echo "DAY=${DAY}"
           PY="$(command -v python || command -v python3)"
+    sleep $((RANDOM % 16 + 5))
           echo "PY=${PY}"
           touch data/logs/route_step_entered
           export PYTHONFAULTHANDLER=1
