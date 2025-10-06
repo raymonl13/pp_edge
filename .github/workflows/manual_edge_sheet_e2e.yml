@@ -278,3 +278,19 @@ jobs:
           if-no-files-found: warn
           path: |
             workspace_fail_safe.tgz
+
+      - name: Create fail-safe bundle (final)
+        if: always()
+        run: |
+          set -euo pipefail
+          tar -czf workspace_fail_safe.tgz .
+
+      - name: Upload fail-safe bundle (final)
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: fail_safe
+          if-no-files-found: warn
+          path: |
+            workspace_fail_safe.tgz
