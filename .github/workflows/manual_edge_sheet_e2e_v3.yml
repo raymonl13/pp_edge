@@ -1,0 +1,11 @@
+name: e2e_v3
+on:
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hello
+        run: |
+          echo "e2e_v3 ok"
