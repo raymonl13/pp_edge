@@ -1,6 +1,7 @@
 name: manual_edge_sheet_e2e
 on:
   push:
+  workflow_dispatch:
     branches: ["main"]
 
 concurrency:
