@@ -22,6 +22,21 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyyaml requests pandas
 
+      - name: Create early probe
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p data/logs
+          date +%s > data/logs/early_probe.txt
+      - name: Upload early probe
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: early_probe
+          if-no-files-found: warn
+          path: |
+            data/logs/early_probe.txt
       - name: Install requests
         if: always()
         run: |
