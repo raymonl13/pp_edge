@@ -11,6 +11,21 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     steps:
+      - name: Create earliest probe
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p data/logs
+          date +%s > data/logs/early_probe.txt
+      - name: Upload earliest probe
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: early_probe
+          if-no-files-found: warn
+          path: |
+            data/logs/early_probe.txt
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
