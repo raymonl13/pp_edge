@@ -73,20 +73,6 @@ jobs:
           set -euo pipefail
           mkdir -p data/logs
           date +%s > data/logs/ci_probe.txt
-      - name: Upload router logs (immediate)
-        if: always()
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: router_logs
-          if-no-files-found: warn
-          path: |
-            router_logs_bundle.tgz
-            data/logs/router_stdout.log
-            data/logs/router_stderr.log
-            data/logs/route_debug.json
-            data/logs/route_step_entered
-            data/logs/ci_probe.txt
       - name: Route fetch (Session 7)
         if: always()
         continue-on-error: true
@@ -107,6 +93,20 @@ jobs:
           RC=$?; echo "route_fetch RC=${RC}"
           set -e
           tar -czf router_logs_bundle.tgz data/logs || true
+      - name: Upload router logs (immediate)
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: router_logs
+          if-no-files-found: warn
+          path: |
+            router_logs_bundle.tgz
+            data/logs/router_stdout.log
+            data/logs/router_stderr.log
+            data/logs/route_debug.json
+            data/logs/route_step_entered
+            data/logs/ci_probe.txt
       - name: Merge router summary into run_debug
         if: always()
         run: |
