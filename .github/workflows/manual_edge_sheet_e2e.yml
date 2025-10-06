@@ -142,27 +142,6 @@ PY
         run: |
           python3 scripts/qa_alloc.py "$DAY" --cfg config_pp_edge_v6.8.yaml
 
-      - name: Board diagnostics
-        if: always()
-        run: |
-          echo '=== BOARD DIAG ==='
-
-      - name: Fallback meta and CSV (force placeholders)
-        if: failure()
-        run: |
-          :> run_meta.txt
-          :> edge_sheet_${DAY}.csv
-
-      - name: Ensure slip meta
-        if: always()
-        run: |
-          :> run_meta.txt || true
-
-      - name: Run debug report
-        if: always()
-        run: |
-          :> run_debug.txt || true
-
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
