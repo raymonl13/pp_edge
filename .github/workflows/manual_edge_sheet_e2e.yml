@@ -73,20 +73,6 @@ jobs:
           set -euo pipefail
           mkdir -p data/logs
           date +%s > data/logs/ci_probe.txt
-      - name: Route fetch (Session 7)
-  if: always()
-  env:
-    ROUTER_API_KEY: ${{ secrets.ROUTER_API_KEY }}
-  run: |
-    set -xeuo pipefail
-    DAY="${{ steps.day.outputs.day }}"
-    mkdir -p data/logs
-    PY="$(command -v python || command -v python3)"
-    export PYTHONFAULTHANDLER=1
-    "$PY" -X dev -W error scripts/route_smoke.py --date "$DAY" || true
-    "$PY" -X dev -W error scripts/route_fetch.py --date "$DAY" 1>data/logs/router_stdout.log 2>data/logs/router_stderr.log || { echo "::error ::route_fetch failed"; tail -n 160 data/logs/router_stderr.log 2>/dev/null || true; exit 1; }
-    test -s "data/pricefix_${DAY}.json"
-
       - name: Upload router logs (immediate)
         if: always()
         continue-on-error: true
@@ -100,17 +86,8 @@ jobs:
             data/logs/route_debug.json
             data/logs/route_step_entered
             data/logs/ci_probe.txt
-      - name: Upload router logs (immediate)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: router_logs_${{ steps.day.outputs.day }}
-          path: |
-            data/logs/router_stdout.log
-            data/logs/router_stderr.log
-            data/logs/route_debug.json
-            data/logs/route_step_entered
       - name: Route fetch (Session 7)
+        continue-on-error: true
   if: always()
   env:
     ROUTER_API_KEY: ${{ secrets.ROUTER_API_KEY }}
@@ -124,6 +101,8 @@ jobs:
     "$PY" -X dev -W error scripts/route_fetch.py --date "$DAY" 1>data/logs/router_stdout.log 2>data/logs/router_stderr.log || { echo "::error ::route_fetch failed"; tail -n 160 data/logs/router_stderr.log 2>/dev/null || true; exit 1; }
     test -s "data/pricefix_${DAY}.json"
 
+          mkdir -p data/logs
+          touch data/logs/route_step_entered
       - name: Merge router summary into run_debug
         if: always()
         run: |
