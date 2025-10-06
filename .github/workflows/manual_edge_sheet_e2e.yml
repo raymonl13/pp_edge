@@ -93,6 +93,20 @@ jobs:
     test -s "data/pricefix_${DAY}.json"
 
           tar -czf router_logs_bundle.tgz data/logs || true
+      - name: Create mid-run fail-safe
+        if: always()
+        run: |
+          set -euo pipefail
+          tar -czf workspace_midrun.tgz .
+      - name: Upload mid-run fail-safe
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: fail_safe_mid
+          if-no-files-found: warn
+          path: |
+            workspace_midrun.tgz
       - name: Upload router logs (immediate)
         if: always()
         continue-on-error: true
