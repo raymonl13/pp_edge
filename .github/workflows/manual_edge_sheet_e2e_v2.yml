@@ -1,0 +1,132 @@
+name: manual_edge_sheet_e2e_v2
+on:
+  push:
+  workflow_dispatch:
+
+concurrency:
+  group: manual_edge_sheet_e2e_v2-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create earliest probe
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p data/logs
+          date +%s > data/logs/early_probe.txt
+
+      - name: Upload earliest probe
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: early_probe
+          if-no-files-found: warn
+          path: |
+            data/logs/early_probe.txt
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r ci/requirements.txt
+
+      - name: Resolve DAY
+        run: |
+          DAY="$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default tomorrow)"
+          echo "DAY=$DAY" >> "$GITHUB_ENV"
+          echo "DAY=$DAY"
+
+      - name: Show router provenance
+        if: always()
+        run: |
+          python - <<'PY'
+from pathlib import Path,hashlib
+p=Path('scripts/route_fetch.py')
+sha=hashlib.sha256(p.read_bytes()).hexdigest()[:16] if p.exists() else 'missing'
+print('ROUTER_SIG='+sha)
+print('--- head scripts/route_fetch.py ---')
+print('\n'.join(p.read_text().splitlines()[:30]) if p.exists() else 'missing')
+PY
+
+      - name: Init router logs dir
+        if: always()
+        run: |
+          mkdir -p data/logs
+
+      - name: Route fetch (Session 7)
+        env:
+          ROUTER_API_KEY: ${{ secrets.ROUTER_API_KEY }}
+        run: |
+          set -xeuo pipefail
+          echo "DAY=${DAY}"
+          PY="$(command -v python || command -v python3)"
+          echo "PY=${PY}"
+          export PYTHONFAULTHANDLER=1
+          "$PY" -X dev -W error scripts/route_smoke.py --date "$DAY" || true
+          "$PY" -X dev -W error scripts/route_fetch.py --date "$DAY" 1>data/logs/router_stdout.log 2>data/logs/router_stderr.log
+          test -s "data/pricefix_${DAY}.json"
+
+      - name: Upload router logs (immediate)
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: router_logs
+          if-no-files-found: warn
+          path: |
+            data/logs/router_stdout.log
+            data/logs/router_stderr.log
+            data/logs/route_debug.json
+
+      - name: Merge router summary into run_debug
+        if: always()
+        run: |
+          cp data/logs/route_debug.json run_debug_router.json || true
+          cat data/logs/router_summary.txt >> run_debug.txt 2>/dev/null || true
+
+      - name: Score board
+        run: |
+          python3 scripts/score_board.py "$DAY" --cfg config_pp_edge_v6.8.yaml
+
+      - name: Diagnose slips
+        run: |
+          python3 scripts/diagnose_slips.py "$DAY" --cfg config_pp_edge_v6.8.yaml
+
+      - name: Build slips
+        run: |
+          python3 scripts/build_slips.py "$DAY" --cfg config_pp_edge_v6.8.yaml
+
+      - name: Allocate stakes
+        run: |
+          python3 scripts/allocate_stakes.py "$DAY" --cfg config_pp_edge_v6.8.yaml
+
+      - name: Ensure CSV exists (guard)
+        run: |
+          test -s "edge_sheet_${DAY}.csv"
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa_alloc_${{ github.run_number }}
+          path: |
+            edge_sheet_${DAY}.csv
+            run_debug.txt
+            run_meta.txt
+            slip_builder_debug.json
+            data/pricefix_${DAY}.json
