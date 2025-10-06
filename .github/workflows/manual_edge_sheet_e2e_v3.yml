@@ -30,5 +30,43 @@ jobs:
           echo "DAY=$DAY" >> "$GITHUB_ENV"
           echo "DAY=$DAY"
 
-      - name: Hello
-        run: echo "base ok"
+      - name: Show router provenance
+        if: always()
+        run: |
+          python - <<'PY'
+from pathlib import Path,hashlib
+p=Path('scripts/route_fetch.py')
+sha=hashlib.sha256(p.read_bytes()).hexdigest()[:16] if p.exists() else 'missing'
+print('ROUTER_SIG='+sha)
+print('--- head scripts/route_fetch.py ---')
+print('\n'.join(p.read_text().splitlines()[:30]) if p.exists() else 'missing')
+PY
+
+      - name: Init router logs dir
+        if: always()
+        run: mkdir -p data/logs
+
+      - name: Route fetch (Session 7)
+        env:
+          ROUTER_API_KEY: ${{ secrets.ROUTER_API_KEY }}
+        run: |
+          set -xeuo pipefail
+          echo "DAY=${DAY}"
+          PY="$(command -v python || command -v python3)"
+          echo "PY=${PY}"
+          export PYTHONFAULTHANDLER=1
+          "$PY" -X dev -W error scripts/route_smoke.py --date "$DAY" || true
+          "$PY" -X dev -W error scripts/route_fetch.py --date "$DAY" 1>data/logs/router_stdout.log 2>data/logs/router_stderr.log
+          test -s "data/pricefix_${DAY}.json"
+
+      - name: Upload router logs
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: router_logs
+          if-no-files-found: warn
+          path: |
+            data/logs/router_stdout.log
+            data/logs/router_stderr.log
+            data/logs/route_debug.json
