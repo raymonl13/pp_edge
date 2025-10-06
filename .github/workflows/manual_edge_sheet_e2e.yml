@@ -22,6 +22,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyyaml requests pandas
 
+      - name: Install requests
+        if: always()
+        run: |
+          set -euo pipefail
+          python -m pip install requests || pip install requests
       - name: Resolve DAY
         run: |
           DAY="$(python3 scripts/resolve_day.py --tz America/Los_Angeles --default tomorrow)"
