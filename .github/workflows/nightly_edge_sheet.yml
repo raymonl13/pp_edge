@@ -40,6 +40,9 @@ jobs:
 
         '
       continue-on-error: false
+    - name: Probe edgesheet presence
+      if: ${{ always() }}
+      run: ls -la edge_sheet_* 2>/dev/null || echo CI_EDGESHEET_ABSENT
     - name: Ensure outcomes skeleton
       run: python scripts/ci_outcomes_skeleton.py
       if: ${{ always() }}
@@ -50,6 +53,13 @@ jobs:
         path: outcomes/**
         if-no-files-found: warn
       if: ${{ always() }}
+    - name: Upload edgesheet
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: edgesheet
+        path: edge_sheet_*.csv
+        if-no-files-found: warn
     - name: Outcomes rollup
       if: ${{ always() }}
       run: 'python scripts/outcomes_rollup.py
