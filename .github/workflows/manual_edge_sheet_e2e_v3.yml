@@ -96,6 +96,7 @@ jobs:
       run: python3 scripts/allocate_stakes.py "$DAY" --cfg config_pp_edge_v6.8.yaml
     - name: Ensure CSV exists (guard)
       run: test -s "edge_sheet_${DAY}.csv"
+      if: steps.parity.outputs.state != 'ERROR'
     - name: Upload
       if: always()
       continue-on-error: true
@@ -139,7 +140,7 @@ jobs:
 
           builder_stderr.log
 
-          '
+          model_parity.json'
     - name: Emit metrics
       if: always()
       run: python3 scripts/emit_metrics.py

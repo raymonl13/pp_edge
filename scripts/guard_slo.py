@@ -29,8 +29,15 @@ def main():
         reasons.append(f"router.row_count<{min_rows}")
     if (retry_count is not None) and (max_retry is not None) and (retry_count > max_retry):
         reasons.append(f"router.retry_count>{max_retry}")
-    day = os.environ.get("DAY", "")
-    for req in (s.get("qa") or {}).get("must_have", []):
+    day = os.environ.get("DAY", "") or ((m.get("run") or {}).get("day") or "")
+    ms="OK"
+try:
+  import re
+  for ln in open("run_meta.txt"): 
+    if ln.startswith("MODEL_STATE="): ms=ln.split("=",1)[1].strip(); break
+except Exception:
+  pass
+for req in (s.get("qa") or {}).get("must_have", []):
         req = req.replace("${{ env.DAY }}", day)
         if not glob_exists(req):
             reasons.append(f"missing:{req}")
