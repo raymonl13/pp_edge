@@ -18,7 +18,7 @@ jobs:
     - name: Install deps
       run: 'python -m pip install --upgrade pip
 
-        python -m pip install pyyaml pandas numpy
+        python -m pip install pyyaml pandas numpy joblib
 
         '
     - name: Resolve DAY
@@ -42,12 +42,14 @@ jobs:
         '
     - name: Ensure outcomes skeleton
       run: python scripts/ci_outcomes_skeleton.py
+      if: ${{ always() }}
     - name: Upload outcomes
       uses: actions/upload-artifact@v4
       with:
         name: outcomes
         path: outcomes/**
         if-no-files-found: warn
+      if: ${{ always() }}
     - name: Outcomes rollup
       if: ${{ always() }}
       run: 'python scripts/outcomes_rollup.py
