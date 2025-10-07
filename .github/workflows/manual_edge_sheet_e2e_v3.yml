@@ -91,6 +91,9 @@ jobs:
     - name: EV advisory (S6.1)
       if: always()
       run: python3 scripts/ev_slip_advisory.py
+    - name: EV correlation (S6.1)
+      if: always()
+      run: python3 scripts/ev_corr_guard.py
     - name: Model parity (post-score, info)
       if: always()
       run: python3 scripts/check_model_parity.py --mode=post
@@ -150,7 +153,9 @@ jobs:
 
           model_parity_post.json
 
-          ev_advisory.json'
+          ev_advisory.json
+
+          ev_correlation.json'
     - name: Emit metrics
       if: always()
       run: python3 scripts/emit_metrics.py
@@ -175,7 +180,14 @@ jobs:
         path: submit_payload.json
     - name: Summarize run
       if: always()
-      run: python3 scripts/summarize_run.py
+      run: "python3 scripts/summarize_run.py\npython3 - <<'PY2'\nfrom pathlib import\
+        \ Path\nimport json\nfor f in ('ev_advisory.json','ev_correlation.json'):\n\
+        \    fp=Path(f)\n    if fp.exists():\n        d=json.loads(fp.read_text())\n\
+        \        if f=='ev_advisory.json':\n            summ = ','.join([s.get('slip_type','?')+':'+s.get('status','?')\
+        \ for s in d.get('summary',[])])\n            print(f\"[ev-adv] {summ}\")\n\
+        \        else:\n            summ = ','.join([s.get('slip_type','?')+':'+s.get('status','?')+('@'+str(s.get('max_proxy')))\
+        \ for s in d.get('summary',[])])\n            print(f\"[ev-corr] {summ}\"\
+        )\nPY2\n# EV_SUMMARY_ECHO"
     - name: SLO guard
       if: always()
       run: python3 scripts/guard_slo.py
