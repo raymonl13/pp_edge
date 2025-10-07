@@ -50,6 +50,13 @@ jobs:
         path: outcomes/**
         if-no-files-found: warn
       if: ${{ always() }}
+    - name: Upload edgesheet
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: edgesheet
+        path: edge_sheet_*.csv
+        if-no-files-found: warn
     - name: Outcomes rollup
       if: ${{ always() }}
       run: 'python scripts/outcomes_rollup.py
