@@ -1,0 +1,21 @@
+router:
+  min_row_count: 100
+  max_retry_count: 5
+qa:
+  must_have:
+    - edge_sheet_${{ env.DAY }}.csv
+    - run_meta.txt
+  optional:
+    - alloc_slips.csv
+    - alloc_slips_with_stakes.csv
+    - alloc_summary.csv
+    - slips.csv
+    - slips.json
+    - slip_diag.txt
+    - slip_diag.json
+    - qa_report.json
+    - qa_report.csv
+    - qa_stdout.log
+    - qa_stderr.log
+    - builder_stdout.log
+    - builder_stderr.log
