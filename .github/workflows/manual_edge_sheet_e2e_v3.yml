@@ -11,6 +11,13 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     steps:
+    - name: Resolve DAY (portable)
+      shell: bash
+      run: "DAY_INPUT=\"${{ github.event.inputs.day }}\"\nif [ -n \"$DAY_INPUT\" ];\
+        \ then\n  echo \"DAY=$DAY_INPUT\" >> \"$GITHUB_ENV\"\nelse\n  python3 - <<'PY2'\
+        \ >> \"$GITHUB_ENV\"\nfrom datetime import date, timedelta\nprint(f\"DAY={(date.today()+timedelta(days=1)).isoformat()}\"\
+        )\nPY2\nfi\necho \"Resolved DAY=$(grep ^DAY= \"$GITHUB_ENV\" | tail -n1 |\
+        \ cut -d= -f2)\""
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
       with:
