@@ -39,6 +39,7 @@ jobs:
       run: 'bash scripts/ci_nightly.sh
 
         '
+      continue-on-error: false
     - name: Ensure outcomes skeleton
       run: python scripts/ci_outcomes_skeleton.py
       if: ${{ always() }}
