@@ -40,6 +40,9 @@ jobs:
 
         '
       continue-on-error: false
+    - name: Probe edgesheet presence
+      if: ${{ always() }}
+      run: ls -la edge_sheet_* 2>/dev/null || echo CI_EDGESHEET_ABSENT
     - name: Ensure outcomes skeleton
       run: python scripts/ci_outcomes_skeleton.py
       if: ${{ always() }}
