@@ -1,6 +1,5 @@
 __pycache__/
 *.pyc
-
 # Project data and assets
 data/
 model_assets/
@@ -13,30 +12,22 @@ model_assets/
 .venv/
 *.yml
 barrel_pct.py tmp_cfg
-
 # Coverage artefacts
 .coverage*
 coverage.xml
-
 # Cypress artefacts
 cypress/screenshots/
 cypress/videos/
-
 # Dashboard build artefacts
 dashboard_v3/node_modules/
 dashboard_v3/dist/
 !model_assets/*.yaml
 !model_assets/.gitkeep
 .DS_Store
-
 !.coveragerc
-
 # keep our tiny offline fixtures
 !fixtures/
-
-
 !fixtures/
-
 # allow GitHub Actions workflows
 !.github/
 !.github/workflows/
@@ -49,3 +40,5 @@ artifacts/
 !.github/workflows/*.yml
 !docs/**/*.yml
 !docs/*.yml
+realized/
+!realized/*.csv
