@@ -142,6 +142,17 @@ jobs:
         name: metrics_${{ github.run_number }}
         if-no-files-found: warn
         path: metrics_run.json
+    - name: Build submit payload (dry-run)
+      if: always()
+      run: python3 scripts/build_submit_payload.py
+    - name: Upload submit payload
+      if: always()
+      uses: actions/upload-artifact@v4
+      continue-on-error: true
+      with:
+        name: submit_payload_${{ github.run_number }}
+        if-no-files-found: warn
+        path: submit_payload.json
     - name: Summarize run
       if: always()
       run: python3 scripts/summarize_run.py
