@@ -131,3 +131,10 @@ jobs:
     - name: SLO guard
       if: always()
       run: python3 scripts/guard_slo.py
+'on':
+  workflow_dispatch:
+    inputs:
+      day:
+        description: Edge-sheet date (YYYY-MM-DD). Leave blank to auto-resolve.
+        required: false
+        type: string
