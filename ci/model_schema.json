@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "features": {
+    "player": "categorical",
+    "game_id": "categorical",
+    "p_hit": "numeric",
+    "edge_pp": "numeric",
+    "tier": "categorical",
+    "slip_type": "categorical"
+  }
+}
