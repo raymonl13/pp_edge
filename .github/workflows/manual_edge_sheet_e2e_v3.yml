@@ -204,6 +204,18 @@ jobs:
     - name: Outcomes logging (S12 lite)
       if: always()
       run: python3 scripts/outcomes_logging.py
+    - name: Upload outcomes
+      if: always()
+      uses: actions/upload-artifact@v4
+      continue-on-error: true
+      with:
+        name: outcomes_${{ github.run_number }}
+        if-no-files-found: warn
+        path: 'outcomes_summary.json
+
+          outcomes/outcomes_*.jsonl
+
+          outcomes/outcomes_*.csv'
     - name: SLO guard
       if: always()
       run: python3 scripts/guard_slo.py
