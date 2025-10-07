@@ -1,7 +1,4 @@
 name: e2e_v3
-true:
-  workflow_dispatch: null
-  push: null
 permissions:
   contents: read
 defaults:
