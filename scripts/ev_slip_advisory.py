@@ -34,6 +34,7 @@ def main():
     edge=f"edge_sheet_{day}.csv" if day else None
     rows=read_csv(edge) if edge and Path(edge).exists() else []
     pol=load_policy()
+    ev_floor=float(pol.get('ev_floor') or 0.0)
     by_slip={"Power4":[],"Power6":[],"Flex6":[]}
     for r in rows:
         st=(r.get("slip_type") or "").strip()
@@ -55,8 +56,9 @@ def main():
         legs_sorted=sorted(legs, reverse=True)[:n_req]
         base_payout={"Power4":(5.0),"Power6":(25.0),"Flex6":(2.0)}.get(st,2.0)
         cev=approx_combo_ev(legs_sorted, base_payout)
-        status="PASS" if cev>=k else "LOW_EV"
-        out["summary"].append({"slip_type":st,"status":status,"n":n_req,"combo_ev":round(cev,5),"threshold":k})
+        ev_eff=max(cev, ev_floor)
+        status="PASS" if ev_eff>=k else "LOW_EV"
+        out["summary"].append({"slip_type":st,"status":status,"n":n_req,"combo_ev_raw":round(cev,5),"combo_ev":round(ev_eff,5),"threshold":k,"ev_floor":ev_floor})
         out["details"][st]={"legs_used":legs_sorted,"base_payout":base_payout}
     Path("ev_advisory.json").write_text(json.dumps(out,indent=2))
     print("[ev] " + " ".join(f"{s['slip_type']}={s['status']}@{s.get('combo_ev','')}" for s in out["summary"]))
