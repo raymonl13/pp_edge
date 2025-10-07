@@ -77,8 +77,17 @@ jobs:
           data/logs/route_debug.json
 
           '
+    - name: Model parity check (S5.1)
+      id: parity
+      if: always()
+      shell: bash
+      run: "python3 scripts/check_model_parity.py\npython3 - <<'PY2'\nimport json,os\n\
+        state='PASS'\ntry:\n state=json.load(open('model_parity.json')).get('parity','PASS')\n\
+        except Exception:\n pass\nopen(os.environ['GITHUB_OUTPUT'],'a').write(f'state={state}\\\
+        n')\nprint(f\"[parity-output] state={state}\")\nPY2"
     - name: Score board
       run: python3 scripts/score_board.py "$DAY" --cfg config_pp_edge_v6.8.yaml
+      if: steps.parity.outputs.state != 'ERROR'
     - name: Diagnose slips
       run: python3 scripts/diagnose_slips.py "$DAY" --cfg config_pp_edge_v6.8.yaml
     - name: Build slips
