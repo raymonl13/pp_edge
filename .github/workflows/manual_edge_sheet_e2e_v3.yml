@@ -11,6 +11,19 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     steps:
+    - name: Early probe
+      shell: bash
+      run: 'set -x
+
+        echo GH_REF=${{ github.ref }}
+
+        uname -a
+
+        python3 -V
+
+        node -v || true
+
+        printenv | sort | head -n 40'
     - name: Resolve DAY (portable)
       shell: bash
       run: "DAY_INPUT=\"${{ github.event.inputs.day }}\"\nif [ -n \"$DAY_INPUT\" ];\
