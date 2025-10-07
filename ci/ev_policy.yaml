@@ -1,0 +1,13 @@
+version: "1.0"
+min_ev_threshold: 0.02
+max_pairwise_corr: 0.35
+slip_types:
+  Power4:
+    enabled: true
+    min_ev_threshold: 0.02
+  Power6:
+    enabled: true
+    min_ev_threshold: 0.025
+  Flex6:
+    enabled: true
+    min_ev_threshold: 0.015

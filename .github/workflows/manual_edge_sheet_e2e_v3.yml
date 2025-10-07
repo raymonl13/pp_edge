@@ -88,6 +88,9 @@ jobs:
     - name: Score board
       run: python3 scripts/score_board.py "$DAY" --cfg config_pp_edge_v6.8.yaml
       if: steps.parity.outputs.state != 'ERROR'
+    - name: EV advisory (S6.1)
+      if: always()
+      run: python3 scripts/ev_slip_advisory.py
     - name: Model parity (post-score, info)
       if: always()
       run: python3 scripts/check_model_parity.py --mode=post
@@ -145,7 +148,9 @@ jobs:
 
           model_parity.json
 
-          model_parity_post.json'
+          model_parity_post.json
+
+          ev_advisory.json'
     - name: Emit metrics
       if: always()
       run: python3 scripts/emit_metrics.py
