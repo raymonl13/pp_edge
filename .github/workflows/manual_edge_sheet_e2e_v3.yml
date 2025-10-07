@@ -88,6 +88,9 @@ jobs:
     - name: Score board
       run: python3 scripts/score_board.py "$DAY" --cfg config_pp_edge_v6.8.yaml
       if: steps.parity.outputs.state != 'ERROR'
+    - name: Model parity (post-score, info)
+      if: always()
+      run: python3 scripts/check_model_parity.py --mode=post
     - name: Diagnose slips
       run: python3 scripts/diagnose_slips.py "$DAY" --cfg config_pp_edge_v6.8.yaml
     - name: Build slips
@@ -140,7 +143,9 @@ jobs:
 
           builder_stderr.log
 
-          model_parity.json'
+          model_parity.json
+
+          model_parity_post.json'
     - name: Emit metrics
       if: always()
       run: python3 scripts/emit_metrics.py

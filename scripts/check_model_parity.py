@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, csv, json, re
+import os, csv, json, re, sys
 from pathlib import Path
 
 def load_metrics():
@@ -79,30 +79,10 @@ def write_meta(updates):
     existing.update(updates)
     p.write_text("\n".join(f"{k}={existing[k]}" for k in sorted(existing))+"\n")
 
-def main():
-    day=os.environ.get("DAY") or infer_day()
-    csv_path=Path(f"edge_sheet_{day}.csv") if day else None
-
-    # SKIP (not ERROR) when the CSV isn't built yet
-    if (not csv_path) or (not csv_path.exists()):
-        out={"parity":"SKIP","reason":"EDGE_SHEET_NOT_BUILT","missing":[],"extra":[],"type_mismatch":[],"schema_version":None}
-        Path("model_parity.json").write_text(json.dumps(out,indent=2))
-        # Do not set MODEL_STATE to ERROR; allow scorer to run
-        print("[parity] state=SKIP missing=0 extra=0 mismatched=0")
-        return
-
-    schema=load_schema()
-    if schema is None or not isinstance(schema.get("features"),dict) or not schema["features"]:
-        out={"parity":"ERROR","reason":"SCHEMA_MISSING_OR_EMPTY","missing":[],"extra":[],"type_mismatch":[],"schema_version": (schema or {}).get("version")}
-        Path("model_parity.json").write_text(json.dumps(out,indent=2))
-        write_meta({"MODEL_STATE":"ERROR","MODEL_REASON":"SCHEMA_MISSING_OR_EMPTY"})
-        print("[parity] state=ERROR missing=0 extra=0 mismatched=0")
-        return
-
+def run_parity(day, csv_path, schema, write_state):
     rows=read_csv_head(csv_path, limit=200)
     found_types=detect_types(rows)
     expected=schema["features"]
-
     missing=sorted([f for f in expected if f not in found_types])
     extra=sorted([c for c in found_types if c not in expected])
     mismatched=[]
@@ -111,16 +91,54 @@ def main():
             got_t=found_types[f]
             if exp_t!=got_t:
                 mismatched.append({"feature":f,"expected":exp_t,"found":got_t})
-
     state="PASS" if (not missing and not mismatched) else "ERROR"
-    out={"parity":state,"reason":None if state=="PASS" else "SCHEMA_MISMATCH","missing":missing,"extra":extra,"type_mismatch":mismatched,"schema_version":schema["version"]}
-    Path("model_parity.json").write_text(json.dumps(out,indent=2))
-    if state=="ERROR":
-        reason=f"missing={len(missing)} mismatched={len(mismatched)}"
-        write_meta({"MODEL_STATE":"ERROR","MODEL_REASON":reason})
+    out={"parity":state,"reason":None if state=="PASS" else "SCHEMA_MISMATCH","missing":missing,"extra":extra,"type_mismatch":mismatched,"schema_version":schema["version"],"day":day}
+    if write_state:
+        if state=="ERROR":
+            reason=f"missing={len(missing)} mismatched={len(mismatched)}"
+            write_meta({"MODEL_STATE":"ERROR","MODEL_REASON":reason})
+        else:
+            write_meta({"MODEL_STATE":"OK","MODEL_REASON":"PARITY_OK"})
+    return out
+
+def main():
+    mode="pre"
+    for a in sys.argv[1:]:
+        if a.startswith("--mode="): mode=a.split("=",1)[1].strip().lower()
+    day=os.environ.get("DAY") or infer_day()
+    csv_path=Path(f"edge_sheet_{day}.csv") if day else None
+    if mode=="pre":
+        if (not csv_path) or (not csv_path.exists()):
+            out={"parity":"SKIP","reason":"EDGE_SHEET_NOT_BUILT","missing":[],"extra":[],"type_mismatch":[],"schema_version":None,"day":day}
+            Path("model_parity.json").write_text(json.dumps(out,indent=2))
+            print("[parity] state=SKIP missing=0 extra=0 mismatched=0")
+            return
+        schema=load_schema()
+        if schema is None or not isinstance(schema.get("features"),dict) or not schema["features"]:
+            out={"parity":"ERROR","reason":"SCHEMA_MISSING_OR_EMPTY","missing":[],"extra":[],"type_mismatch":[],"schema_version": (schema or {}).get("version"),"day":day}
+            Path("model_parity.json").write_text(json.dumps(out,indent=2))
+            write_meta({"MODEL_STATE":"ERROR","MODEL_REASON":"SCHEMA_MISSING_OR_EMPTY"})
+            print("[parity] state=ERROR missing=0 extra=0 mismatched=0")
+            return
+        out=run_parity(day,csv_path,schema,write_state=True)
+        Path("model_parity.json").write_text(json.dumps(out,indent=2))
+        print(f"[parity] state={out['parity']} missing={len(out['missing'])} extra={len(out['extra'])} mismatched={len(out['type_mismatch'])}")
+        return
     else:
-        write_meta({"MODEL_STATE":"OK","MODEL_REASON":"PARITY_OK"})
-    print(f"[parity] state={state} missing={len(missing)} extra={len(extra)} mismatched={len(mismatched)}")
+        if (not csv_path) or (not csv_path.exists()):
+            out={"parity":"SKIP","reason":"EDGE_SHEET_NOT_BUILT","missing":[],"extra":[],"type_mismatch":[],"schema_version":None,"day":day}
+            Path("model_parity_post.json").write_text(json.dumps(out,indent=2))
+            print("[parity-post] state=SKIP")
+            return
+        schema=load_schema()
+        if schema is None or not isinstance(schema.get("features"),dict) or not schema["features"]:
+            out={"parity":"INFO","reason":"SCHEMA_MISSING_OR_EMPTY","missing":[],"extra":[],"type_mismatch":[],"schema_version": (schema or {}).get("version"),"day":day}
+            Path("model_parity_post.json").write_text(json.dumps(out,indent=2))
+            print("[parity-post] state=INFO")
+            return
+        out=run_parity(day,csv_path,schema,write_state=False)
+        Path("model_parity_post.json").write_text(json.dumps(out,indent=2))
+        print(f"[parity-post] state={out['parity']} missing={len(out['missing'])} extra={len(out['extra'])} mismatched={len(out['type_mismatch'])}")
 
 if __name__=="__main__":
     main()
