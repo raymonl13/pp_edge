@@ -79,11 +79,11 @@ jobs:
           name: qa_alloc_${{ github.run_number }}
           if-no-files-found: warn
           path: |
-            edge_sheet_${DAY}.csv
+            edge_sheet_${{ env.DAY }}.csv
             run_meta.txt
             run_debug.txt
             slip_builder_debug.json
-            data/pricefix_${DAY}.json
+            data/pricefix_${{ env.DAY }}.json
             alloc_slips.csv
             alloc_slips_with_stakes.csv
             alloc_summary.csv
