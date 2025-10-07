@@ -1,14 +1,11 @@
-version: "1.1"
+version: "1.2"
 
-# EV thresholds
 min_ev_threshold: 0.0
 ev_floor: 0.0
 
-# Correlation proxy strictness
-max_pairwise_corr: 0.70
+max_pairwise_corr: 0.60
 corr_proxy_fields: ["game_id", "team", "market"]
 
-# Stake & bankroll controls (advisory; allocator unchanged)
 explore_stake: 0.0
 kelly_fraction: 0.25
 bankroll_policy:
@@ -17,14 +14,13 @@ bankroll_policy:
   slip_cap_fraction: 0.01
   round_to: 1.0
 
-# Per-type toggles and optional thresholds
 slip_types:
   Power4:
     enabled: true
-    min_ev_threshold: 0.0
+    min_ev_threshold: 0.010
   Power6:
     enabled: true
-    min_ev_threshold: 0.0
+    min_ev_threshold: 0.015
   Flex6:
     enabled: true
-    min_ev_threshold: 0.0
+    min_ev_threshold: 0.008
