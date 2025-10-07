@@ -1,0 +1,51 @@
+name: nightly_edge_sheet
+on:
+  schedule:
+    - cron: '30 15 * * *'
+  workflow_dispatch:
+    inputs:
+      day:
+        description: 'Edge-sheet date (YYYY-MM-DD). Leave blank for tomorrow (UTC).'
+        required: false
+        type: string
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyyaml pandas numpy
+      - name: Resolve DAY
+        run: |
+          DAY="$(python scripts/resolve_day.py '${{ inputs.day }}')"
+          echo "DAY=$DAY" >> $GITHUB_ENV
+          echo "DAY=$DAY"
+      - name: Run pipeline scripts
+        run: |
+          bash scripts/ci_nightly.sh
+      - name: Upload outcomes
+        uses: actions/upload-artifact@v4
+        with:
+          name: outcomes
+          path: outcomes/**
+          if-no-files-found: warn
+      - name: Outcomes rollup
+        if: ${{ always() }}
+        run: |
+          python scripts/outcomes_rollup.py
+      - name: Upload rollup
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: outcomes_rollup
+          path: |
+            outcomes/outcomes_rollup.csv
+            outcomes/outcomes_rollup.json
+          if-no-files-found: warn
