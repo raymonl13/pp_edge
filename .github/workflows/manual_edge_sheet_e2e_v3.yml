@@ -44,15 +44,56 @@ jobs:
           "$PY" -X dev -W error scripts/route_fetch.py --date "$DAY" 1>data/logs/router_stdout.log 2>data/logs/router_stderr.log
           test -s "data/pricefix_${DAY}.json"
 
-      - name: Tar router logs
-  if: always()
-  run: tar -czf router_logs_bundle.tgz data/logs || true
-- name: Upload router logs
-  if: always()
-  continue-on-error: true
-  uses: actions/upload-artifact@v4
-  with:
-    name: router_logs
-    if-no-files-found: warn
-    path: |
-      router_logs_bundle.tgz
+      - name: Upload router logs
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: router_logs
+          if-no-files-found: warn
+          path: |
+            data/logs/router_stdout.log
+            data/logs/router_stderr.log
+            data/logs/route_debug.json
+
+      - name: Score board
+        run: python3 scripts/score_board.py "$DAY" --cfg config_pp_edge_v6.8.yaml
+
+      - name: Diagnose slips
+        run: python3 scripts/diagnose_slips.py "$DAY" --cfg config_pp_edge_v6.8.yaml
+
+      - name: Build slips
+        run: python3 scripts/build_slips.py "$DAY" --cfg config_pp_edge_v6.8.yaml
+
+      - name: Allocate stakes
+        run: python3 scripts/allocate_stakes.py "$DAY" --cfg config_pp_edge_v6.8.yaml
+
+      - name: Ensure CSV exists (guard)
+        run: test -s "edge_sheet_${DAY}.csv"
+
+      - name: Upload
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa_alloc_${{ github.run_number }}
+          if-no-files-found: warn
+          path: |
+            edge_sheet_${DAY}.csv
+            run_meta.txt
+            run_debug.txt
+            slip_builder_debug.json
+            data/pricefix_${DAY}.json
+            alloc_slips.csv
+            alloc_slips_with_stakes.csv
+            alloc_summary.csv
+            slips.csv
+            slips.json
+            slip_diag.txt
+            slip_diag.json
+            qa_report.json
+            qa_report.csv
+            qa_stdout.log
+            qa_stderr.log
+            builder_stdout.log
+            builder_stderr.log
