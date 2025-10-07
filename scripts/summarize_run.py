@@ -54,6 +54,16 @@ def main():
                 next(rdr, None)
                 csv_rows = sum(1 for _ in rdr)
     print(f"[csv] rows={csv_rows if csv_rows is not None else '?'}")
+    try:
+        import json
+        from pathlib import Path
+        for f in ('model_parity.json','model_parity_post.json'):
+            fp=Path(f)
+            if fp.exists():
+                d=json.loads(fp.read_text())
+                print(f"[parity] file={f} state={d.get('parity')} reason={d.get('reason')}")
+    except Exception:
+        pass
     meta = first("run_meta.txt") or first("**/run_meta.txt")
     if meta:
         kv = {}
