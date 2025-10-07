@@ -56,7 +56,6 @@ def main():
     print(f"[csv] rows={csv_rows if csv_rows is not None else '?'}")
     try:
         import json
-        from pathlib import Path
         for f in ('model_parity.json','model_parity_post.json'):
             fp=Path(f)
             if fp.exists():
