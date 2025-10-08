@@ -44,7 +44,9 @@ def build_rollup(outcomes_glob: str, realized_glob: str, out_csv: str, out_json:
         brier = None
         logloss = None
         if probs is not None and "leg_id" in df_r.columns:
-            j = pd.merge(df_r[["leg_id","outcome"]], probs, on="leg_id", how="inner")
+            df_r["leg_id"]=df_r["leg_id"].astype(str).str.strip()
+probs["leg_id"]=probs["leg_id"].astype(str).str.strip()
+j = pd.merge(df_r[["leg_id","outcome"]], probs, on="leg_id", how="inner")
             if not j.empty:
                 brier, logloss = _brier_and_logloss(j["outcome"].astype(float), j["p"].astype(float))
         daily.append({
