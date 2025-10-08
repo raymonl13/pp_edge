@@ -98,6 +98,12 @@ jobs:
       run: 'python scripts/outcomes_rollup.py
 
         '
+    - name: Edgesheet summary
+      if: ${{ always() }}
+      shell: bash
+      run: F=edge_sheet_${{ env.DAY }}.csv; HDR=$(head -n1 "$F" 2>/dev/null || echo
+        "none"); ROWS=0; [ -s "$F" ] && ROWS=$(wc -l < "$F"); echo "[edgesheet] rows=$ROWS
+        hdr=$HDR"
     - name: Upload rollup
       if: ${{ always() }}
       uses: actions/upload-artifact@v4
