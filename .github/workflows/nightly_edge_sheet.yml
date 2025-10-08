@@ -99,6 +99,11 @@ jobs:
 
         '
       continue-on-error: true
+    - name: Rollup diag
+      if: ${{ always() }}
+      shell: bash
+      run: echo '--- outcomes dir ---'; ls -la outcomes || true; echo '--- rollup
+        json ---'; cat outcomes/outcomes_rollup.json || true
     - name: Rollup probe
       if: ${{ always() }}
       shell: bash
