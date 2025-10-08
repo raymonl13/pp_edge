@@ -98,6 +98,17 @@ jobs:
       run: 'python scripts/outcomes_rollup.py
 
         '
+    - name: Rollup probe
+      if: ${{ always() }}
+      shell: bash
+      run: python scripts/rollup_probe.py | tee rollup_probe.json
+    - name: Upload rollup probe
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: rollup_probe
+        path: rollup_probe.json
+        if-no-files-found: warn
     - name: Edgesheet summary
       if: ${{ always() }}
       shell: bash
