@@ -3,6 +3,12 @@ jobs:
   nightly:
     runs-on: ubuntu-latest
     steps:
+    - name: Gate sanity
+      run: "python - <<EOF\nimport yaml,sys\ny=yaml.safe_load(open(\".github/workflows/nightly_edge_sheet.yml\"\
+        ).read())\nok=False\nfor s in y[\"jobs\"][\"nightly\"][\"steps\"]:\n  if s.get(\"\
+        name\")==\"Run pipeline scripts\":\n    ok = (s.get(\"continue-on-error\"\
+        , False) is False)\n    break\nprint(\"[gate] sanity hard=\",ok)\nsys.exit(0\
+        \ if ok else 2)\nEOF"
     - name: Checkout
       uses: actions/checkout@v4
     - name: Early probe
