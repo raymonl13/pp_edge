@@ -1,3 +1,11 @@
+on:
+  workflow_dispatch:
+    inputs:
+      day:
+        description: "YYYY-MM-DD"
+        required: false
+        default: ""
+
 name: nightly_edge_sheet
 jobs:
   nightly:
