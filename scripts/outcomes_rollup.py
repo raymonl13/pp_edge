@@ -103,4 +103,3 @@ if __name__ == "__main__":
             json.dumps({"days": 0, "error": str(e)}, indent=2)
         )
         print("[rollup] days=0 roi=None brier=None")
-        raise
