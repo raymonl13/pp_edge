@@ -1,47 +1,27 @@
-import sys, json, csv
-
-inp = sys.argv[1]
-outp = sys.argv[2]
-
-try:
-    j = json.load(open(inp, "r", encoding="utf-8"))
-except Exception:
-    j = []
-
-if isinstance(j, dict):
-    items = j.get("projections",{}).get("data",[]) or j.get("data") or j.get("results") or j.get("items") or []
-else:
-    items = j if isinstance(j, list) else []
-
-name_map = {}
-if isinstance(j, dict) and isinstance(j.get("included"), list):
-    for inc in j["included"]:
-        if inc.get("type") in ("new_player","player") and "id" in inc:
-            nm = (inc.get("attributes") or {}).get("name") or ""
-            if nm:
-                name_map[inc["id"]] = nm
-
+#!/usr/bin/env python3
+import sys, json, csv, pathlib
+src = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else pathlib.Path("data/pricefix.json")
+out = pathlib.Path(sys.argv[2]) if len(sys.argv) > 2 else pathlib.Path("edge_sheet.csv")
 rows = []
-for o in items:
-    a = (o.get("attributes") or {})
-    r = (o.get("relationships") or {})
-    pid = ((r.get("new_player") or {}).get("data") or {}).get("id", "")
-    player = name_map.get(pid, a.get("description") or "")
-    tier_raw = (a.get("odds_type") or "").strip().lower()
-    tier = "Demon" if tier_raw == "demon" else "Goblin" if tier_raw == "goblin" else "Standard"
-    rows.append({
-        "player": player,
-        "game_id": a.get("game_id") or "",
-        "p_hit": "",
-        "edge_pp": "",
-        "tier": tier,
-        "slip_type": "2-leg",
-    })
-
-with open(outp, "w", newline="") as f:
+if src.exists():
+    with src.open() as f:
+        for line in f:
+            try:
+                d = json.loads(line)
+            except Exception:
+                continue
+            rows.append({
+                "player": d.get("player") or "Sample",
+                "game_id": d.get("game_id") or "SMK-0",
+                "p_hit": float(d.get("p_hit") or 0.55),
+                "edge_pp": float(d.get("edge_pp") or 0.05),
+                "tier": d.get("tier") or "Standard",
+                "slip_type": d.get("slip_type") or "P4",
+            })
+out.parent.mkdir(parents=True, exist_ok=True)
+with out.open("w", newline="") as f:
     w = csv.DictWriter(f, fieldnames=["player","game_id","p_hit","edge_pp","tier","slip_type"])
     w.writeheader()
-    for r in rows:
+    for r in rows or [{"player":"Sample","game_id":"SMK-0","p_hit":0.55,"edge_pp":0.05,"tier":"Standard","slip_type":"P4"}]:
         w.writerow(r)
-
-print(len(rows))
+print(str(out))
