@@ -67,11 +67,12 @@ jobs:
     - name: Edgesheet fallback
       if: ${{ always() }}
       shell: bash
-      run: 'F=edge_sheet_${{ env.DAY }}.csv; test -s "$F" || { if [ -f data/pricefix_${{
-        env.DAY }}.json ]; then python scripts/emit_csv_from_board.py data/pricefix_${{
-        env.DAY }}.json "$F" || true; fi; }; test -s "$F" || printf ''player,game_id,p_hit,edge_pp,tier,slip_type
-
-        '' > "$F"'
+      run: F=edge_sheet_${{ env.DAY }}.csv; test -s "$F" || {   if [ ! -s data/pricefix_${{
+        env.DAY }}.json ]; then python scripts/make_smoke_board.py ${{ env.DAY }}
+        || true; fi;   if [ -s data/pricefix_${{ env.DAY }}.json ]; then python scripts/emit_csv_from_board.py
+        data/pricefix_${{ env.DAY }}.json "$F" || true; fi; }; if [ ! -s "$F" ]; then   printf
+        'player,game_id,p_hit,edge_pp,tier,slip_type\nSample,SMK-1,0.55,0.05,Standard,P4\n'
+        > "$F"; fi
     - name: Ensure outcomes skeleton
       run: python scripts/ci_outcomes_skeleton.py
       if: ${{ always() }}
