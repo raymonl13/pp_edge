@@ -38,6 +38,17 @@ jobs:
     - name: Fetch board (router)
       shell: bash
       run: python code_data_ingest_pricefix_v1.py --date "${{ env.DAY }}" || true
+    - name: Board fallback (smoke)
+      if: ${{ always() }}
+      shell: bash
+      run: test -s data/pricefix_${{ env.DAY }}.json || python scripts/make_smoke_board.py
+        ${{ env.DAY }} || true
+    - name: Emit edgesheet from board
+      if: ${{ always() }}
+      shell: bash
+      run: F=edge_sheet_${{ env.DAY }}.csv; test -s "$F" || { test -s data/pricefix_${{
+        env.DAY }}.json && python scripts/emit_csv_from_board.py data/pricefix_${{
+        env.DAY }}.json "$F" || true; }
     - name: Upload board
       if: ${{ always() }}
       uses: actions/upload-artifact@v4
