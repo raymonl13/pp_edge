@@ -92,5 +92,15 @@ def main():
     args = ap.parse_args()
     build_rollup(args.outcomes_glob, args.realized_glob, args.out_csv, args.out_json)
 
+
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        Path("outcomes").mkdir(parents=True, exist_ok=True)
+        Path("outcomes/outcomes_rollup.csv").write_text("")
+        Path("outcomes/outcomes_rollup.json").write_text(
+            json.dumps({"days": 0, "error": str(e)}, indent=2)
+        )
+        print("[rollup] days=0 roi=None brier=None")
+        raise
