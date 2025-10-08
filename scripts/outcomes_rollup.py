@@ -1,58 +1,40 @@
 #!/usr/bin/env python3
-import argparse, json, pathlib, re
-from typing import Optional, Tuple
-import numpy as np
+import argparse, json, glob, pathlib
 import pandas as pd
-
-DAY_RX = re.compile(r"(\d{4}-\d{2}-\d{2})")
-
-def _coerce_day_from_name(p: pathlib.Path) -> Optional[str]:
-    m = DAY_RX.search(p.stem)
-    return m.group(1) if m else None
-
-def _load_realized_by_day(realized_glob: str) -> dict:
-    out = {}
-    for p in sorted(pathlib.Path(".").glob(realized_glob)):
-        day = _coerce_day_from_name(p)
-        if not day:
-            continue
-        df = pd.read_csv(p)
-        df = df.rename(columns={"result":"outcome","win":"outcome"})
-        df["outcome"] = df["outcome"].astype(int)
-        df["stake"] = df["stake"].astype(float)
-        df["payout"] = df["payout"].astype(float)
-        out[day] = df
-    return out
+from typing import Optional, Tuple
 
 def _load_probs_from_edge_sheet(day: str) -> Optional[pd.DataFrame]:
     p = pathlib.Path(f"edge_sheet_{day}.csv")
     if not p.exists():
         return None
     df = pd.read_csv(p)
-    for c in ("p_hit","p","prob","prob_win"):
+    id_col = None
+    for c in ["leg_id","game_id","player"]:
         if c in df.columns:
-            df = df.rename(columns={c:"p"})
+            id_col = c
             break
-    if "p" not in df.columns:
+    prob_col = "p" if "p" in df.columns else ("p_hit" if "p_hit" in df.columns else None)
+    if id_col is None or prob_col is None:
         return None
-    if "leg_id" not in df.columns:
-        key_cols = [c for c in ("player","stat","line") if c in df.columns]
-        if key_cols:
-            df["leg_id"] = df[key_cols].astype(str).agg("|".join, axis=1)
-        else:
-            return None
-    return df[["leg_id","p"]].drop_duplicates()
+    out = df[[id_col, prob_col]].copy()
+    out.columns = ["leg_id","p"]
+    return out
 
-def _brier_and_logloss(y: pd.Series, p: pd.Series) -> Tuple[Optional[float], Optional[float]]:
-    if len(y) == 0 or len(p) == 0:
-        return None, None
-    p = p.clip(1e-12, 1-1e-12)
-    brier = float(np.mean((p - y) ** 2))
-    logloss = float(-np.mean(y*np.log(p) + (1-y)*np.log(1-p)))
-    return brier, logloss
+def _brier_and_logloss(y_true: pd.Series, p: pd.Series) -> Tuple[float,float]:
+    import numpy as np
+    p = p.clip(1e-9, 1-1e-9)
+    brier = float(((p - y_true)**2).mean())
+    ll = float(-(y_true*np.log(p) + (1-y_true)*np.log(1-p)).mean())
+    return brier, ll
 
 def build_rollup(outcomes_glob: str, realized_glob: str, out_csv: str, out_json: str):
-    realized_by_day = _load_realized_by_day(realized_glob)
+    realized = sorted(glob.glob(realized_glob))
+    realized_by_day = {}
+    for rp in realized:
+        day = pathlib.Path(rp).stem.split("_")[-1]
+        df = pd.read_csv(rp)
+        realized_by_day.setdefault(day, pd.DataFrame()). \
+            pipe(lambda _: realized_by_day.__setitem__(day, pd.concat([realized_by_day[day], df], ignore_index=True)) or realized_by_day[day])
     daily = []
     for day, df_r in sorted(realized_by_day.items()):
         staked = df_r["stake"].sum()
