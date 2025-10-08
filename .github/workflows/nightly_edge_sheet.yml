@@ -134,6 +134,7 @@ jobs:
       run: python scripts/ci_artifact_echo.py
     env:
       DAY: ${{ inputs.day }}
+      ENGINE_HARD_TEST: '1'
 'on':
   schedule:
   - cron: 30 15 * * *
