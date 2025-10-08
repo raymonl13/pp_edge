@@ -126,9 +126,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: outcomes_rollup
-        path: 'outcomes/outcomes_rollup.csv
-
-          outcomes/outcomes_rollup.json'
+        path: outcomes/outcomes_rollup.*
         if-no-files-found: warn
       continue-on-error: true
     - name: Artifact echo
