@@ -98,6 +98,7 @@ jobs:
       run: 'python scripts/outcomes_rollup.py
 
         '
+      continue-on-error: true
     - name: Rollup probe
       if: ${{ always() }}
       shell: bash
