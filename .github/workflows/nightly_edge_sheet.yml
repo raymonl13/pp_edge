@@ -65,11 +65,11 @@ jobs:
         HDR=$(head -n1 "$F" 2>/dev/null || echo ""); ROWS=0; [ -s "$F" ] && ROWS=$(wc
         -l < "$F"); if [ "$HDR" != "$NEED" ] || [ "$ROWS" -lt 2 ]; then   test -s
         "data/pricefix_${{ env.DAY }}.json" || python scripts/make_smoke_board.py
-        ${{ env.DAY }} || true;   if [ -s "data/pricefix_${{ env.DAY }}.json" ]; then     python
-        scripts/emit_csv_from_board.py "data/pricefix_${{ env.DAY }}.json" "$F" ||
-        true;   fi; fi; HDR=$(head -n1 "$F" 2>/dev/null || echo ""); ROWS=0; [ -s
-        "$F" ] && ROWS=$(wc -l < "$F"); if [ "$HDR" != "$NEED" ] || [ "$ROWS" -lt
-        2 ]; then   printf "%s
+        ${{ env.DAY }} || true;   if [ -s "data/pricefix_${{ env.DAY }}.json" ]; then
+        python scripts/emit_csv_from_board.py "data/pricefix_${{ env.DAY }}.json"
+        "$F" || true; fi; fi; HDR=$(head -n1 "$F" 2>/dev/null || echo ""); ROWS=0;
+        [ -s "$F" ] && ROWS=$(wc -l < "$F"); if [ "$HDR" != "$NEED" ] || [ "$ROWS"
+        -lt 2 ]; then   printf "%s
 
         " "$NEED" > "$F";   printf "A,Sample A,SMK-1,0.58,0.58,0.06,Standard,P4
 
