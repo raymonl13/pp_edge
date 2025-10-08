@@ -51,11 +51,9 @@ jobs:
         path: data/pricefix_${{ env.DAY }}.json
         if-no-files-found: warn
     - name: Run pipeline scripts
-      run: 'bash scripts/ci_nightly.sh
-
-        '
-      continue-on-error: false
-    - name: Probe edgesheet presence
+  run: bash -eo pipefail -c 'bash scripts/ci_nightly.sh 2> >(tee engine_stderr.log >&2) | tee engine_stdout.log'
+      continue-on-error:  false
+- name: Probe edgesheet presence
       if: ${{ always() }}
       run: ls -la edge_sheet_* 2>/dev/null || echo CI_EDGESHEET_ABSENT
     - name: Edgesheet fallback
