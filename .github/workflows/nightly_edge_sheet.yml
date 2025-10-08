@@ -35,6 +35,16 @@ jobs:
       run: if command -v actionlint >/dev/null 2>&1; then find .github/workflows -maxdepth
         1 -type f \( -name '*.yml' -o -name '*.yaml' \) -exec actionlint -oneline
         -no-color {} +; fi
+    - name: Fetch board (router)
+      shell: bash
+      run: python code_data_ingest_pricefix_v1.py --date "${{ env.DAY }}" || true
+    - name: Upload board
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: router_board
+        path: data/pricefix_${{ env.DAY }}.json
+        if-no-files-found: warn
     - name: Run pipeline scripts
       run: 'bash scripts/ci_nightly.sh
 
