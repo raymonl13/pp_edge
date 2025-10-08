@@ -43,6 +43,14 @@ jobs:
     - name: Probe edgesheet presence
       if: ${{ always() }}
       run: ls -la edge_sheet_* 2>/dev/null || echo CI_EDGESHEET_ABSENT
+    - name: Edgesheet fallback
+      if: ${{ always() }}
+      shell: bash
+      run: 'F=edge_sheet_${{ env.DAY }}.csv; test -s "$F" || { if [ -f data/pricefix_${{
+        env.DAY }}.json ]; then python scripts/emit_csv_from_board.py data/pricefix_${{
+        env.DAY }}.json "$F" || true; fi; }; test -s "$F" || printf ''player,game_id,p_hit,edge_pp,tier,slip_type
+
+        '' > "$F"'
     - name: Ensure outcomes skeleton
       run: python scripts/ci_outcomes_skeleton.py
       if: ${{ always() }}
