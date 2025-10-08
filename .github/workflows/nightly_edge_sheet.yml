@@ -123,10 +123,9 @@ jobs:
         name: outcomes_rollup
         path: 'outcomes/outcomes_rollup.csv
 
-          outcomes/outcomes_rollup.json
-
-          '
+          outcomes/outcomes_rollup.json'
         if-no-files-found: warn
+      continue-on-error: true
     - name: Artifact echo
       if: always()
       run: python scripts/ci_artifact_echo.py
