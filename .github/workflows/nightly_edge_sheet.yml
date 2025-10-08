@@ -118,6 +118,8 @@ jobs:
     - name: Artifact echo
       if: always()
       run: python scripts/ci_artifact_echo.py
+    env:
+      DAY: ${{ inputs.day }}
 'on':
   schedule:
   - cron: 30 15 * * *
