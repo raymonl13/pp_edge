@@ -61,14 +61,21 @@ jobs:
     - name: Edgesheet fallback
       if: ${{ always() }}
       shell: bash
-      run: F=edge_sheet_${{ env.DAY }}.csv; if [ ! -s "$F" ] || [ "$(wc -l < "$F")"
-        -lt 2 ]; then   if [ ! -s data/pricefix_${{ env.DAY }}.json ]; then python
-        scripts/make_smoke_board.py ${{ env.DAY }} || true; fi;   if [ -s data/pricefix_${{
-        env.DAY }}.json ]; then python scripts/emit_csv_from_board.py data/pricefix_${{
-        env.DAY }}.json "$F" || true; fi; fi; if [ ! -s "$F" ] || [ "$(wc -l < "$F")"
-        -lt 2 ]; then   printf "player,game_id,p_hit,edge_pp,tier,slip_type\nSample
-        A,SMK-1,0.58,0.06,Standard,P4\nSample B,SMK-2,0.62,0.08,Standard,P4\n" > "$F";
-        fi
+      run: 'F=edge_sheet_${{ env.DAY }}.csv; NEED="leg_id,player,game_id,p,p_hit,edge_pp,tier,slip_type";
+        HDR=$(head -n1 "$F" 2>/dev/null || echo ""); ROWS=0; [ -s "$F" ] && ROWS=$(wc
+        -l < "$F"); if [ "$HDR" != "$NEED" ] || [ "$ROWS" -lt 2 ]; then   test -s
+        "data/pricefix_${{ env.DAY }}.json" || python scripts/make_smoke_board.py
+        ${{ env.DAY }} || true;   if [ -s "data/pricefix_${{ env.DAY }}.json" ]; then     python
+        scripts/emit_csv_from_board.py "data/pricefix_${{ env.DAY }}.json" "$F" ||
+        true;   fi; fi; HDR=$(head -n1 "$F" 2>/dev/null || echo ""); ROWS=0; [ -s
+        "$F" ] && ROWS=$(wc -l < "$F"); if [ "$HDR" != "$NEED" ] || [ "$ROWS" -lt
+        2 ]; then   printf "%s
+
+        " "$NEED" > "$F";   printf "A,Sample A,SMK-1,0.58,0.58,0.06,Standard,P4
+
+        " >> "$F";   printf "B,Sample B,SMK-2,0.62,0.62,0.08,Standard,P4
+
+        " >> "$F"; fi'
     - name: Ensure outcomes skeleton
       run: python scripts/ci_outcomes_skeleton.py
       if: ${{ always() }}
