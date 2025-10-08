@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+[ "${ENGINE_HARD_TEST:-0}" = "1" ] && { echo "ENGINE_HARD_TEST_FAIL"; exit 1; }
 set -euo pipefail
 mkdir -p outcomes realized
 : "${DAY:=}"
