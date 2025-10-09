@@ -124,6 +124,31 @@ jobs:
         path: drift_${ env.DAY }.json
         if-no-files-found: warn
 
+    - name: Calibration probe
+      if: ${{ always() }}
+      continue-on-error: true
+      shell: bash
+      run: python scripts/calibration_probe.py "$DAY" | tee calibration_${ env.DAY }.json
+    - name: Upload calibration
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: calibration
+        path: calibration_${ env.DAY }.json
+        if-no-files-found: warn
+    - name: Drift probe
+      if: ${{ always() }}
+      continue-on-error: true
+      shell: bash
+      run: python scripts/drift_probe.py "$DAY" | tee drift_${ env.DAY }.json
+    - name: Upload drift
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: drift
+        path: drift_${ env.DAY }.json
+        if-no-files-found: warn
+
     - name: Rollup probe
       shell: bash
       run: python scripts/rollup_probe.py | tee rollup_probe.json
