@@ -20,14 +20,17 @@ elif all(c in dfp.columns for c in ["player","game_id"]) and all(c in dfr.column
     keys=["player","game_id"]
 elif "game_id" in dfp.columns and "game_id" in dfr.columns:
     keys=["game_id"]
+elif "leg_id" in dfr.columns and "leg_id" not in dfp.columns:
+    dfp=dfp.copy()
+    dfp["leg_id"]=[chr(ord("A")+i) for i in range(len(dfp))]
+    keys=["leg_id"]
 else:
     print(json.dumps(out)); sys.exit(0)
 for k in keys:
     if k in dfr.columns: dfr[k]=dfr[k].astype(str).str.strip()
     if k in dfp.columns: dfp[k]=dfp[k].astype(str).str.strip()
 left=dfr[keys+["outcome"]].copy()
-right=dfp[keys+[pcol]].copy()
-right=right.rename(columns={pcol:"p"})
+right=dfp[keys+[pcol]].copy().rename(columns={pcol:"p"})
 j=left.merge(right,on=keys,how="inner",validate="m:m")
 out["join_rows"]=int(len(j))
 if len(j):
