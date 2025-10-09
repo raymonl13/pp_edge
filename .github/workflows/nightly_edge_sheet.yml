@@ -129,3 +129,14 @@ jobs:
         description: Edge-sheet date (YYYY-MM-DD). Leave blank for tomorrow (UTC).
         required: false
         type: string
+
+- name: Rollup probe
+  shell: bash
+  run: python scripts/rollup_probe.py | tee rollup_probe.json
+- name: Upload rollup probe
+  if: ${{ always() }}
+  uses: actions/upload-artifact@v4
+  with:
+    name: rollup_probe
+    path: rollup_probe.json
+    if-no-files-found: warn
