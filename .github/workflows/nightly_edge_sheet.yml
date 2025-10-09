@@ -99,6 +99,38 @@ jobs:
 
         '
 
+    - name: Drift probe
+      if: ${{ always() }}
+      continue-on-error: true
+      shell: bash
+      run: python scripts/drift_probe.py "$DAY" > "drift_${DAY}.json" || true
+    - name: Drift diag
+      if: ${{ always() }}
+      run: ls -l drift_*.json || true
+    - name: Upload drift
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: drift
+        path: drift_*.json
+        if-no-files-found: warn
+
+    - name: Calibration probe
+      if: ${{ always() }}
+      continue-on-error: true
+      shell: bash
+      run: python scripts/calibration_probe.py "$DAY" > "calibration_${DAY}.json" || true
+    - name: Calibration diag
+      if: ${{ always() }}
+      run: ls -l calibration_*.json || true
+    - name: Upload calibration
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: calibration
+        path: calibration_*.json
+        if-no-files-found: warn
+
     - name: Calibration probe
       if: ${{ always() }}
       continue-on-error: true
