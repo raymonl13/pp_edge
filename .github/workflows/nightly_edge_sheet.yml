@@ -247,3 +247,52 @@ jobs:
         description: Edge-sheet date (YYYY-MM-DD). Leave blank for tomorrow (UTC).
         required: false
         type: string
+
+    - name: Calibration rollup
+      if: ${{ always() }}
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        mkdir -p ci_cache/calibration calibration_trend
+        gh run list --workflow nightly_edge_sheet.yml --branch "${{ github.ref_name }}" -L 30 --json databaseId | jq -r '.[].databaseId' | while read id; do
+          gh run download "$id" -n calibration -D "ci_cache/calibration/$id" >/dev/null 2>&1 || true
+        done
+        python scripts/calibration_rollup.py --glob "ci_cache/calibration/**/*.json" --outdir "calibration_trend"
+    - name: Upload calibration_trend
+      if: ${{ always() }}
+      continue-on-error: true
+      uses: actions/upload-artifact@v4
+      with:
+        name: calibration_trend
+        path: calibration_trend/*
+        if-no-files-found: warn
+    - name: Drift guard
+      if: ${{ always() }}
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        mkdir -p ci_cache/drift drift_trend
+        gh run list --workflow nightly_edge_sheet.yml --branch "${{ github.ref_name }}" -L 30 --json databaseId | jq -r '.[].databaseId' | while read id; do
+          gh run download "$id" -n drift -D "ci_cache/drift/$id" >/dev/null 2>&1 || true
+        done
+        python scripts/drift_guard.py --glob "ci_cache/drift/**/*.json" --slo "ci/slo.yaml" --outdir "drift_trend"
+    - name: Upload drift_trend
+      if: ${{ always() }}
+      continue-on-error: true
+      uses: actions/upload-artifact@v4
+      with:
+        name: drift_trend
+        path: drift_trend/*
+        if-no-files-found: warn
+    - name: Schema guard
+      if: ${{ always() }}
+      continue-on-error: true
+      run: |
+        python scripts/schema_guard.py --schemas-dir schema --data-dir .
+    - name: Feature contract (dry)
+      if: ${{ always() }}
+      continue-on-error: true
+      run: |
+        python scripts/feature_contract_check.py --expected schema/expected_model_features.json --data-dir .
