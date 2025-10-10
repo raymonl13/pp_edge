@@ -4,7 +4,7 @@ day=(sys.argv[1] if len(sys.argv)>1 else "").strip()
 if not day:
     print(json.dumps({"error":"missing_day"})); sys.exit(0)
 es=pathlib.Path(f"edge_sheet_{day}.csv")
-out={"day":day,"psi":None,"ref_days":0}
+out={"day":day,"psi":None,"ref_days":0,"rows_current":None,"rows_ref":None}
 if not es.exists():
     print(json.dumps(out)); sys.exit(0)
 df=pd.read_csv(es)
@@ -23,6 +23,10 @@ import numpy as np
 refdf=pd.concat(ref,ignore_index=True)
 out["ref_days"]=int(len(ref))
 def psi(a,b,bins=10):
+    import math
+    n=min(len(a),len(b))
+    if n<50: return None
+    bins=min(10, max(3, int(math.sqrt(n))))
     qa=np.quantile(a,np.linspace(0,1,bins+1)); qb=np.quantile(b,np.linspace(0,1,bins+1))
     edges=np.unique(np.concatenate([qa,qb]))
     pa,_=np.histogram(a,bins=edges); pb,_=np.histogram(b,bins=edges)
