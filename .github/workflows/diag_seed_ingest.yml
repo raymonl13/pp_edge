@@ -1,6 +1,11 @@
 name: diag_seed_ingest
 on:
   workflow_dispatch:
+  inputs:
+    day:
+      description: "YYYY-MM-DD"
+      required: false
+      default: ""
 jobs:
   seed_ingest:
     runs-on: ubuntu-latest
