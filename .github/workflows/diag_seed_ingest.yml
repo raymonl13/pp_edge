@@ -1,11 +1,11 @@
 name: diag_seed_ingest
 on:
   workflow_dispatch:
-  inputs:
-    day:
-      description: "YYYY-MM-DD"
-      required: false
-      default: ""
+    inputs:
+      day:
+        description: "YYYY-MM-DD"
+        required: false
+        default: ""
 jobs:
   seed_ingest:
     runs-on: ubuntu-latest
@@ -19,16 +19,15 @@ jobs:
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install pandas pyarrow pyyaml
+          pip install pandas pyarrow pyyaml numpy
       - name: Synthesize calibration and drift from seeds
         run: |
           set -e
-          DAY="${{ github.event.inputs.day || '' }}"
+          DAY="${{ github.event.inputs.day }}"
           if [ -z "$DAY" ]; then DAY="$(date -u +%F)"; fi
           if [ -f "realized/realized_${DAY}.csv" ]; then
             python - <<'PY'
-import pandas as pd, json, os, datetime as dt, numpy as np
-import sys
+import pandas as pd, json, os, numpy as np
 d=os.getenv("DAY")
 df=pd.read_csv(f"realized/realized_{d}.csv")
 eps=1e-9
@@ -42,7 +41,7 @@ print(f"calibration/calibration_{d}.json")
 PY
           fi
           YEST="$(python - <<'PY'
-import os,datetime as dt,sys
+import os,datetime as dt
 d=os.getenv("DAY")
 y=dt.datetime.strptime(d,"%Y-%m-%d")-dt.timedelta(days=1)
 print(y.strftime("%Y-%m-%d"))
