@@ -78,15 +78,16 @@ jobs:
           name: edgesheet
           path: edge_sheet_*.csv
           if-no-files-found: warn
-      - name: Drift probe
-        if: ${{ always() }}
-
       - name: Rollup probe
         if: ${{ always() }}
         shell: bash
         run: |
           set -e
-          echo '{"day":"${{ env.DAY }}","edge_rows":'$(awk 'END{print NR-1}' edge_sheet_${{ env.DAY }}.csv 2>/dev/null || echo 0)'}' > rollup_probe_${{ env.DAY }}.json
+          F="edge_sheet_${{ env.DAY }}.csv"
+          ROWS=0
+          if [ -s "$F" ]; then ROWS=$(awk 'END{print NR-1}' "$F"); fi
+          printf '{"day":"%s","edge_rows":%s}
+' "${{ env.DAY }}" "$ROWS" > "rollup_probe_${{ env.DAY }}.json"
       - name: Upload rollup_probe
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
@@ -94,6 +95,8 @@ jobs:
           name: rollup_probe
           path: rollup_probe_${{ env.DAY }}.json
           if-no-files-found: warn
+      - name: Drift probe
+        if: ${{ always() }}
         shell: bash
         run: |
           set -e
@@ -112,6 +115,13 @@ jobs:
           set -e
           python scripts/calibration_probe.py "${{ env.DAY }}" > "calibration_${{ env.DAY }}.json" || true
       - name: Upload calibration
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: calibration
+          path: calibration_${{ env.DAY }}.json
+          if-no-files-found: warn
+     - name: Upload calibration
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
