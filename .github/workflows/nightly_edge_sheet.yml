@@ -128,3 +128,10 @@ jobs:
           name: calibration
           path: calibration_${{ env.DAY }}.json
           if-no-files-found: warn
+     - name: Upload calibration
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: calibration
+          path: calibration_${{ env.DAY }}.json
+          if-no-files-found: warn
