@@ -80,6 +80,20 @@ jobs:
           if-no-files-found: warn
       - name: Drift probe
         if: ${{ always() }}
+
+      - name: Rollup probe
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -e
+          echo '{"day":"${{ env.DAY }}","edge_rows":'$(awk 'END{print NR-1}' edge_sheet_${{ env.DAY }}.csv 2>/dev/null || echo 0)'}' > rollup_probe_${{ env.DAY }}.json
+      - name: Upload rollup_probe
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollup_probe
+          path: rollup_probe_${{ env.DAY }}.json
+          if-no-files-found: warn
         shell: bash
         run: |
           set -e
