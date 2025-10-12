@@ -83,6 +83,33 @@ jobs:
         shell: bash
         run: |
           set -e
+          python - <<'PY'
+          import json,os,sys
+          d=os.getenv('DAY') or os.getenv('GITHUB_ENV') or ''
+          day=os.getenv('DAY') or os.getenv('INPUTS_DAY') or os.getenv('GITHUB_ENV') or os.getenv('{ env.DAY }','')
+          if not day:
+              day=os.environ.get('GITHUB_ENV','')
+          try:
+              day=os.environ.get('DAY') or '${{ env.DAY }}'
+          except Exception:
+              pass
+          import pathlib
+          f=pathlib.Path(f"edge_sheet_${{{{ env.DAY }}}}"+".csv")
+          rows=0
+          try:
+              with f.open() as fh:
+                  rows=max(0,sum(1 for _ in fh)-1)
+          except Exception:
+              rows=0
+          out={'day':'${{ env.DAY }}','edge_rows':rows}
+          open(f"rollup_probe_${{{{ env.DAY }}}}"+".json","w").write(json.dumps(out))
+          print(f"rollup_probe_${{{{ env.DAY }}}}"+".json")
+          PY
+     - name: Rollup probe
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -e
           F="edge_sheet_${{ env.DAY }}.csv"
           ROWS=0
           if [ -s "$F" ]; then ROWS=$(wc -l < "$F"); fi
