@@ -85,36 +85,15 @@ jobs:
           set -e
           python - <<'PY'
           import json,os,sys
-          d=os.getenv('DAY') or os.getenv('GITHUB_ENV') or ''
-          day=os.getenv('DAY') or os.getenv('INPUTS_DAY') or os.getenv('GITHUB_ENV') or os.getenv('{ env.DAY }','')
-          if not day:
-              day=os.environ.get('GITHUB_ENV','')
-          try:
-              day=os.environ.get('DAY') or '${{ env.DAY }}'
-          except Exception:
-              pass
-          import pathlib
-          f=pathlib.Path(f"edge_sheet_${{{{ env.DAY }}}}"+".csv")
+          day=os.environ.get('DAY') or '${{ env.DAY }}'
           rows=0
           try:
-              with f.open() as fh:
+              with open(f"edge_sheet_${{{{ env.DAY }}}}"+".csv") as fh:
                   rows=max(0,sum(1 for _ in fh)-1)
           except Exception:
               rows=0
-          out={'day':'${{ env.DAY }}','edge_rows':rows}
-          open(f"rollup_probe_${{{{ env.DAY }}}}"+".json","w").write(json.dumps(out))
-          print(f"rollup_probe_${{{{ env.DAY }}}}"+".json")
+          open(f"rollup_probe_${{{{ env.DAY }}}}"+".json","w").write(json.dumps({'day':'${{ env.DAY }}','edge_rows':rows}))
           PY
-     - name: Rollup probe
-        if: ${{ always() }}
-        shell: bash
-        run: |
-          set -e
-          F="edge_sheet_${{ env.DAY }}.csv"
-          ROWS=0
-          if [ -s "$F" ]; then ROWS=$(wc -l < "$F"); fi
-          if [ "$ROWS" -gt 0 ]; then ROWS=$((ROWS-1)); fi
-          printf '{"day":"%s","edge_rows":%s}\n' "${{ env.DAY }}" "$ROWS" > "rollup_probe_${{ env.DAY }}.json"
       - name: Upload rollup_probe
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
@@ -141,21 +120,8 @@ jobs:
         run: |
           set -e
           python scripts/calibration_probe.py "${{ env.DAY }}" > "calibration_${{ env.DAY }}.json" || true
-         uses: actions/upload-artifact@v4
-        with:
-          name: calibration
-          path: calibration_${{ env.DAY }}.json
-          if-no-files-found: warn
-        uses: actions/upload-artifact@v4
-        with:
-          name: calibration
-          path: calibration_${{ env.DAY }}.json
-          if-no-files-found: warn
-        uses: actions/upload-artifact@v4
-        with:
-          name: calibration
-          path: calibration_${{ env.DAY }}.json
-          if-no-files-found: warn
+      - name: Upload calibration
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: calibration
