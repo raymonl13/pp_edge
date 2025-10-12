@@ -1,0 +1,57 @@
+name: diag_seed_ingest_combo
+on:
+  workflow_dispatch:
+    inputs:
+      day:
+        description: "YYYY-MM-DD"
+        required: false
+        default: ""
+  repository_dispatch:
+    types: [seed_ingest]
+  push:
+    paths:
+      - .github/diag_kick.txt
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy
+      - name: Resolve DAY
+        id: day
+        run: |
+          set -e
+          D="${{ github.event.inputs.day }}"
+          if [ -z "$D" ] && [ "${{ github.event_name }}" = "repository_dispatch" ]; then D="${{ github.event.client_payload.day }}"; fi
+          if [ -z "$D" ]; then D="$(date -u +%F)"; fi
+          echo "DAY=$D" >> $GITHUB_OUTPUT
+      - name: Write artifacts
+        run: |
+          set -e
+          DAY="${{ steps.day.outputs.DAY }}"
+          mkdir -p calibration drift
+          python - <<'PY'
+import json,os
+d=os.getenv("DAY")
+open(f"calibration/calibration_{d}.json","w").write(json.dumps({"day":d,"brier":0.2,"logloss":0.6,"join_rows":100}))
+open(f"drift/drift_{d}.json","w").write(json.dumps({"day":d,"psi":0.05,"rows_current":100,"rows_ref":100,"ref_days":1}))
+print("ok")
+PY
+      - name: Upload calibration
+        uses: actions/upload-artifact@v4
+        with:
+          name: calibration
+          path: calibration/*.json
+      - name: Upload drift
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift
+          path: drift/*.json
