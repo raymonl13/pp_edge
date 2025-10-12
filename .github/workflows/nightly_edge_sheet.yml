@@ -12,118 +12,219 @@ on:
     paths:
       - .github/nightly_kick.txt
 jobs:
+
   nightly:
+
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install deps
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install pyyaml pandas numpy joblib
-      - name: Resolve DAY
-        id: day
-        shell: bash
-        run: |
-          set -e
-          D="${{ inputs.day }}"
-          if [ -z "$D" ] && [ "${{ github.event_name }}" = "repository_dispatch" ]; then D="${{ github.event.client_payload.day }}"; fi
-          if [ -z "$D" ]; then D="$(date -u +%F)"; fi
-          echo "DAY=$D" >> "$GITHUB_ENV"
-          echo "DAY=$D"
-      - name: Fetch board (router)
-        shell: bash
-        run: |
-          set -e
-          python code_data_ingest_pricefix_v1.py --date "${{ env.DAY }}" || true
-      - name: Board fallback (smoke)
-        if: ${{ always() }}
-        shell: bash
-        run: |
-          set -e
-          test -s "data/pricefix_${{ env.DAY }}.json" || python scripts/make_smoke_board.py "${{ env.DAY }}" || true
-      - name: Upload board
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: router_board
-          path: data/pricefix_${{ env.DAY }}.json
-          if-no-files-found: warn
-      - name: Run pipeline scripts
-        shell: bash
-        run: |
-          set -e
-          bash scripts/ci_nightly.sh
-      - name: Probe edgesheet presence
-        if: ${{ always() }}
-        run: ls -la edge_sheet_* 2>/dev/null || echo CI_EDGESHEET_ABSENT
-      - name: Ensure outcomes skeleton
-        if: ${{ always() }}
-        run: python scripts/ci_outcomes_skeleton.py
-      - name: Upload outcomes
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: outcomes
-          path: outcomes/**
-          if-no-files-found: warn
-      - name: Upload edgesheet
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: edgesheet
-          path: edge_sheet_*.csv
-          if-no-files-found: warn
-      - name: Rollup probe
-        if: ${{ always() }}
-        shell: bash
-        run: |
-          set -e
-          python - <<'PY'
-          import json,os
-          day=os.environ.get('DAY') or '${{ env.DAY }}'
-          rows=0
-          try:
-              with open(f"edge_sheet_${{{{ env.DAY }}}}"+".csv") as fh:
-                  rows=max(0,sum(1 for _ in fh)-1)
-          except Exception:
-              rows=0
-          open(f"rollup_probe_${{{{ env.DAY }}}}"+".json","w").write(json.dumps({'day':'${{ env.DAY }}','edge_rows':rows}))
-          PY
-      - name: Upload rollup_probe
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: rollup_probe
-          path: rollup_probe_${{ env.DAY }}.json
-          if-no-files-found: warn
-      - name: Drift probe
-        if: ${{ always() }}
-        shell: bash
-        run: |
-          set -e
-          python scripts/drift_probe.py "${{ env.DAY }}" > "drift_${{ env.DAY }}.json" || true
-      - name: Upload drift
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: drift
-          path: drift_${{ env.DAY }}.json
-          if-no-files-found: warn
-      - name: Calibration probe
-        if: ${{ always() }}
-        shell: bash
-        run: |
-          set -e
-          python scripts/calibration_probe.py "${{ env.DAY }}" > "calibration_${{ env.DAY }}.json" || true
-      - name: Upload calibration
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: calibration
-          path: calibration_${{ env.DAY }}.json
-          if-no-files-found: warn
+
+    - name: Checkout
+
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+
+      uses: actions/setup-python@v5
+
+      with:
+
+        python-version: "3.11"
+
+    - name: Install deps
+
+      run: |
+
+        python -m pip install --upgrade pip
+
+        python -m pip install pyyaml pandas numpy joblib
+
+    - name: Resolve DAY
+
+      id: day
+
+      shell: bash
+
+      run: |
+
+        set -e
+
+        D="${{ inputs.day }}"
+
+        if [ -z "$D" ] && [ "${{ github.event_name }}" = "repository_dispatch" ]; then D="${{ github.event.client_payload.day }}"; fi
+
+        if [ -z "$D" ]; then D="$(date -u +%F)"; fi
+
+        echo "DAY=$D" >> "$GITHUB_ENV"
+
+        echo "DAY=$D"
+
+    - name: Fetch board (router)
+
+      shell: bash
+
+      run: |
+
+        set -e
+
+        python code_data_ingest_pricefix_v1.py --date "${{ env.DAY }}" || true
+
+    - name: Board fallback (smoke)
+
+      if: ${{ always() }}
+
+      shell: bash
+
+      run: |
+
+        set -e
+
+        test -s "data/pricefix_${{ env.DAY }}.json" || python scripts/make_smoke_board.py "${{ env.DAY }}" || true
+
+    - name: Upload board
+
+      if: ${{ always() }}
+
+      uses: actions/upload-artifact@v4
+
+      with:
+
+        name: router_board
+
+        path: data/pricefix_${{ env.DAY }}.json
+
+        if-no-files-found: warn
+
+    - name: Run pipeline scripts
+
+      shell: bash
+
+      run: |
+
+        set -e
+
+        bash scripts/ci_nightly.sh
+
+    - name: Upload outcomes
+
+      if: ${{ always() }}
+
+      uses: actions/upload-artifact@v4
+
+      with:
+
+        name: outcomes
+
+        path: outcomes/**
+
+        if-no-files-found: warn
+
+    - name: Upload edgesheet
+
+      if: ${{ always() }}
+
+      uses: actions/upload-artifact@v4
+
+      with:
+
+        name: edgesheet
+
+        path: edge_sheet_*.csv
+
+        if-no-files-found: warn
+
+    - name: Rollup probe
+
+      if: ${{ always() }}
+
+      shell: bash
+
+      run: |
+
+        set -e
+
+        python - <<'PY'
+
+        import json,os
+
+        rows=0
+
+        try:
+
+            with open(f"edge_sheet_${{ env.DAY }}.csv") as fh:
+
+                rows=max(0,sum(1 for _ in fh)-1)
+
+        except Exception:
+
+            rows=0
+
+        open(f"rollup_probe_${{ env.DAY }}.json","w").write(json.dumps({'day':'${{ env.DAY }}','edge_rows':rows}))
+
+        PY
+
+    - name: Upload rollup_probe
+
+      if: ${{ always() }}
+
+      uses: actions/upload-artifact@v4
+
+      with:
+
+        name: rollup_probe
+
+        path: rollup_probe_${{ env.DAY }}.json
+
+        if-no-files-found: warn
+
+    - name: Drift probe
+
+      if: ${{ always() }}
+
+      shell: bash
+
+      run: |
+
+        set -e
+
+        python scripts/drift_probe.py "${{ env.DAY }}" > "drift_${{ env.DAY }}.json" || true
+
+    - name: Upload drift
+
+      if: ${{ always() }}
+
+      uses: actions/upload-artifact@v4
+
+      with:
+
+        name: drift
+
+        path: drift_${{ env.DAY }}.json
+
+        if-no-files-found: warn
+
+    - name: Calibration probe
+
+      if: ${{ always() }}
+
+      shell: bash
+
+      run: |
+
+        set -e
+
+        python scripts/calibration_probe.py "${{ env.DAY }}" > "calibration_${{ env.DAY }}.json" || true
+
+    - name: Upload calibration
+
+      if: ${{ always() }}
+
+      uses: actions/upload-artifact@v4
+
+      with:
+
+        name: calibration
+
+        path: calibration_${{ env.DAY }}.json
+
+        if-no-files-found: warn
