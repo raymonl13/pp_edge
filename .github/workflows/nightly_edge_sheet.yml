@@ -105,6 +105,12 @@ jobs:
 
         bash scripts/ci_nightly.sh
 
+    - name: Ensure outcomes skeleton
+
+      if: ${{ always() }}
+
+      run: python scripts/ci_outcomes_skeleton.py
+
     - name: Upload outcomes
 
       if: ${{ always() }}
