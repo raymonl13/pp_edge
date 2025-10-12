@@ -84,7 +84,7 @@ jobs:
         run: |
           set -e
           python - <<'PY'
-          import json,os,sys
+          import json,os
           day=os.environ.get('DAY') or '${{ env.DAY }}'
           rows=0
           try:
