@@ -1,40 +1,53 @@
-#!/usr/bin/env python3
-import sys, json, pathlib, pandas as pd
-day=(sys.argv[1] if len(sys.argv)>1 else "").strip()
-if not day:
-    print(json.dumps({"error":"missing_day"})); sys.exit(0)
-es=pathlib.Path(f"edge_sheet_{day}.csv")
-out={"day":day,"psi":None,"ref_days":0,"rows_current":None,"rows_ref":None}
-if not es.exists():
-    print(json.dumps(out)); sys.exit(0)
-df=pd.read_csv(es)
-cols=[c for c in ["p","p_hit","edge_pp","tier","slip_type"] if c in df.columns]
-if not cols:
-    print(json.dumps(out)); sys.exit(0)
-ref=[]
-for p in pathlib.Path(".").glob("edge_sheet_*.csv"):
-    if p.name.endswith(f"{day}.csv"):
-        continue
-    try: ref.append(pd.read_csv(p)[cols])
-    except Exception: pass
-if not ref:
-    print(json.dumps(out)); sys.exit(0)
+import sys,os,math,json
+from datetime import datetime,timedelta
+try:
+    import pandas as pd
+except Exception:
+    print(json.dumps({"day":sys.argv[1] if len(sys.argv)>1 else "", "psi":None, "rows_current":None, "rows_ref":None, "ref_days":0})); sys.exit(0)
+def psi(cur, ref, bins=10, eps=1e-6):
+    qs=[i/bins for i in range(bins+1)]
+    edges=ref.quantile(qs).values
+    edges[0]=min(edges[0],cur.min(),ref.min())-eps
+    edges[-1]=max(edges[-1],cur.max(),ref.max())+eps
+    c=pd.cut(cur, edges, include_lowest=True).value_counts().sort_index()
+    r=pd.cut(ref, edges, include_lowest=True).value_counts().sort_index()
+    c=(c/c.sum()).clip(eps,1).values
+    r=(r/r.sum()).clip(eps,1).values
+    return float(((c-r)*np.log(c/r)).sum())
 import numpy as np
-refdf=pd.concat(ref,ignore_index=True)
-out["ref_days"]=int(len(ref))
-def psi(a,b,bins=10):
-    import math
-    n=min(len(a),len(b))
-    if n<50: return None
-    bins=min(10, max(3, int(math.sqrt(n))))
-    qa=np.quantile(a,np.linspace(0,1,bins+1)); qb=np.quantile(b,np.linspace(0,1,bins+1))
-    edges=np.unique(np.concatenate([qa,qb]))
-    pa,_=np.histogram(a,bins=edges); pb,_=np.histogram(b,bins=edges)
-    pa=pa/max(pa.sum(),1); pb=pb/max(pb.sum(),1)
-    s=0.0
-    for x,y in zip(pa,pb):
-        x=max(x,1e-9); y=max(y,1e-9); s+= (x-y)*np.log(x/y)
-    return float(s)
-num="p" if "p" in cols else ("p_hit" if "p_hit" in cols else None)
-if num: out["psi"]=psi(df[num].dropna().to_numpy(), refdf[num].dropna().to_numpy())
-print(json.dumps(out))
+import pandas as pd
+day = sys.argv[1] if len(sys.argv)>1 else ""
+if not day:
+    print(json.dumps({"day":"","psi":None,"rows_current":None,"rows_ref":None,"ref_days":0})); sys.exit(0)
+cur_path=f"edge_sheet_{day}.csv"
+try:
+    cur=pd.read_csv(cur_path)
+except Exception:
+    print(json.dumps({"day":day,"psi":None,"rows_current":0,"rows_ref":None,"ref_days":0})); sys.exit(0)
+try:
+    d=datetime.strptime(day,"%Y-%m-%d")
+    y=(d-timedelta(days=1)).strftime("%Y-%m-%d")
+except Exception:
+    y=""
+ref_path=f"edge_sheet_{y}.csv" if y else ""
+ref=None
+ref_days=0
+if ref_path and os.path.exists(ref_path):
+    try:
+        ref=pd.read_csv(ref_path); ref_days=1
+    except Exception:
+        ref=None; ref_days=0
+rows_cur=int(cur.shape[0])
+rows_ref=int(ref.shape[0]) if isinstance(ref,pd.DataFrame) else None
+pcol=None
+for c in ["p_hit","p"]:
+    if c in cur.columns: pcol=c; break
+if pcol is None:
+    print(json.dumps({"day":day,"psi":None,"rows_current":rows_cur,"rows_ref":rows_ref,"ref_days":ref_days})); sys.exit(0)
+if not isinstance(ref,pd.DataFrame) or pcol not in ref.columns or rows_cur<10 or (rows_ref or 0)<10:
+    print(json.dumps({"day":day,"psi":None,"rows_current":rows_cur,"rows_ref":rows_ref,"ref_days":ref_days})); sys.exit(0)
+try:
+    v=float(psi(cur[pcol].astype(float), ref[pcol].astype(float), bins=10))
+except Exception:
+    v=None
+print(json.dumps({"day":day,"psi":v,"rows_current":rows_cur,"rows_ref":rows_ref,"ref_days":ref_days}))
