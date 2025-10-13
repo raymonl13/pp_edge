@@ -113,6 +113,33 @@ jobs:
 
     - name: Upload outcomes
 
+
+    - name: Outcomes rollup
+
+      if: ${{ always() }}
+
+      shell: bash
+
+      run: |
+
+        set -e
+
+        python scripts/outcomes_rollup.py "${{ env.DAY }}" > outcomes_rollup_${{ env.DAY }}.json || true
+
+    - name: Upload outcomes_rollup
+
+      if: ${{ always() }}
+
+      uses: actions/upload-artifact@v4
+
+      with:
+
+        name: outcomes_rollup
+
+        path: outcomes_rollup_${{ env.DAY }}.json
+
+        if-no-files-found: warn
+
       if: ${{ always() }}
 
       uses: actions/upload-artifact@v4
