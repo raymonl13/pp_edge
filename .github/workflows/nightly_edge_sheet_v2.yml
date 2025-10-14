@@ -1,0 +1,9 @@
+name: nightly_edge_sheet_v2
+on:
+  workflow_dispatch:
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Echo
+        run: echo OK
