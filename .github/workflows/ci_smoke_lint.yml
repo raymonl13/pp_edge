@@ -1,0 +1,29 @@
+name: ci_smoke_lint
+on:
+  workflow_dispatch:
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install pyyaml
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pyyaml
+      - name: Download actionlint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash | bash -s -- -b .
+      - name: Parse nightly v2 YAML
+        run: |
+          python3 - <<'PY'
+import yaml,sys
+p=".github/workflows/nightly_edge_sheet_v2.yml"
+y=yaml.safe_load(open(p).read())
+print("PARSE_OK")
+print("JOBS_KEYS", list(y.get("jobs",{}).keys()))
+print("STEPS_COUNT", len(y["jobs"]["nightly"]["steps"]))
+PY
+      - name: actionlint v2
+        run: |
+          ./actionlint -oneline -no-color .github/workflows/nightly_edge_sheet_v2.yml
