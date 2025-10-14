@@ -5,44 +5,23 @@ jobs:
   nightly:
     runs-on: ubuntu-latest
     steps:
-      - name: Echo
-        run: echo OK
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install deps
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install pyyaml pandas numpy joblib
       - name: Resolve DAY
         id: day
-        shell: bash
         run: |
           set -e
           D="$(date -u +%F)"
           echo "DAY=$D" >> "$GITHUB_ENV"
-          echo "DAY=$D"
-      - name: Upload outcomes
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: outcomes
-          path: outcomes/**
-          if-no-files-found: warn
-      - name: Upload edgesheet
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: edgesheet
-          path: edge_sheet_*.csv
-          if-no-files-found: warn
+          echo "day=$D" >> "$GITHUB_OUTPUT"
       - name: Rollup probe
-        if: ${{ always() }}
-        shell: bash
         run: |
           set -e
-          python - <<'PY2'
+          python - <<'PY'
 import json,os
 d=os.environ.get('DAY') or ''
 rows=0
@@ -52,11 +31,22 @@ try:
 except Exception:
   rows=0
 open(f"rollup_probe_{d}.json","w").write(json.dumps({'day':d,'edge_rows':rows}))
-PY2
+PY
       - name: Upload rollup_probe
-        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: rollup_probe
-          path: rollup_probe_${{ env.DAY }}.json
+          path: rollup_probe_${{ steps.day.outputs.day }}.json
+          if-no-files-found: warn
+      - name: Upload outcomes
+        uses: actions/upload-artifact@v4
+        with:
+          name: outcomes
+          path: outcomes/**
+          if-no-files-found: warn
+      - name: Upload edgesheet
+        uses: actions/upload-artifact@v4
+        with:
+          name: edgesheet
+          path: edge_sheet_*.csv
           if-no-files-found: warn
