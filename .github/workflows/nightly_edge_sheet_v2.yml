@@ -7,3 +7,41 @@ jobs:
     steps:
       - name: Echo
         run: echo OK
+      - name: Upload outcomes
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: outcomes
+          path: outcomes/**
+          if-no-files-found: warn
+      - name: Upload edgesheet
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: edgesheet
+          path: edge_sheet_*.csv
+          if-no-files-found: warn
+      - name: Rollup probe
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -e
+          python - <<'PY2'
+import json,os
+d=os.environ.get('DAY') or ''
+rows=0
+try:
+  with open(f"edge_sheet_{d}.csv") as fh:
+    rows=max(0,sum(1 for _ in fh)-1)
+except Exception:
+  rows=0
+open(f"rollup_probe_{d}.json","w").write(json.dumps({'day':d,'edge_rows':rows}))
+PY2
+      - name: Upload rollup_probe
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollup_probe
+          path: rollup_probe_${{ env.DAY }}.json
+          if-no-files-found: warn
+
