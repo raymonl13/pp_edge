@@ -1,0 +1,13 @@
+name: zz_dispatch_probe
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/zz_dispatch_probe.yml
+      - .github/zz_probe_kick.txt
+jobs:
+  just_echo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Echo
+        run: echo DISPATCH_OK
