@@ -1,6 +1,9 @@
 name: ci_smoke_lint
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/ci_smoke_lint.yml
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -27,5 +30,3 @@ PY
       - name: actionlint v2
         run: |
           ./actionlint -oneline -no-color .github/workflows/nightly_edge_sheet_v2.yml
-
-# idx
