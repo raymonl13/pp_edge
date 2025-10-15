@@ -11,3 +11,19 @@ jobs:
     steps:
       - name: Echo
         run: echo NIGHTLY_V3_OK
+
+      - name: Drift probe
+        run: |
+          set -e
+          python - <<'PY4'
+import json,os
+d=os.environ.get('DAY') or ''
+# placeholder drift payload
+open(f"drift_{d}.json","w").write(json.dumps({"day":d,"psi":None,"ref_days":0,"rows_current":None,"rows_ref":None}))
+PY4
+      - name: Upload drift
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift
+          path: drift_${{ steps.day.outputs.day }}.json
+          if-no-files-found: warn
