@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - .github/workflows/nightly_edge_sheet_v2.yml
+      - .github/nightly_v2_kick.txt
 jobs:
   nightly:
     runs-on: ubuntu-latest
