@@ -1,6 +1,10 @@
 name: nightly_edge_sheet_v3
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/nightly_edge_sheet_v3.yml
+      - .github/nightly_v3_kick.txt
 jobs:
   nightly:
     runs-on: ubuntu-latest
