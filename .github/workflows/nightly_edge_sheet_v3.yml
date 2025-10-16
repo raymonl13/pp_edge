@@ -9,6 +9,17 @@ jobs:
   nightly:
     runs-on: ubuntu-latest
     steps:
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          set -e
+          python -m pip install --upgrade pip
+          pip install pandas pyarrow pyyaml
+
       - name: Resolve DAY
         id: day
         run: |
@@ -16,6 +27,7 @@ jobs:
           D="$(date -u +%F)"
           echo "DAY=$D" >> "$GITHUB_ENV"
           echo "day=$D" >> "$GITHUB_OUTPUT"
+
       - name: Rollup probe
         run: |
           set -e
@@ -23,38 +35,45 @@ jobs:
           ROWS=0
           if [ -s "$F" ]; then ROWS=$(wc -l < "$F"); ROWS=$((ROWS>0?ROWS-1:0)); fi
           printf '{"day":"%s","edge_rows":%s}\n' "$DAY" "$ROWS" > "rollup_probe_${DAY}.json"
+
       - name: Upload rollup_probe
         uses: actions/upload-artifact@v4
         with:
           name: rollup_probe
           path: rollup_probe_${{ steps.day.outputs.day }}.json
           if-no-files-found: warn
+
       - name: Upload outcomes
         uses: actions/upload-artifact@v4
         with:
           name: outcomes
           path: outcomes/**
           if-no-files-found: warn
+
       - name: Upload edgesheet
         uses: actions/upload-artifact@v4
         with:
           name: edgesheet
           path: edge_sheet_*.csv
           if-no-files-found: warn
+
       - name: Calibration probe
         run: |
           set -e
-          printf '{"day":"%s","join_rows":0,"brier":null,"logloss":null}\n' "$DAY" > "calibration_${DAY}.json"
+          python scripts/calibration_probe.py "$DAY" > "calibration_${DAY}.json"
+
       - name: Upload calibration
         uses: actions/upload-artifact@v4
         with:
           name: calibration
           path: calibration_${{ steps.day.outputs.day }}.json
           if-no-files-found: warn
+
       - name: Drift probe
         run: |
           set -e
-          printf '{"day":"%s","psi":null,"ref_days":0,"rows_current":null,"rows_ref":null}\n' "$DAY" > "drift_${DAY}.json"
+          python scripts/drift_probe.py "$DAY" > "drift_${DAY}.json"
+
       - name: Upload drift
         uses: actions/upload-artifact@v4
         with:
