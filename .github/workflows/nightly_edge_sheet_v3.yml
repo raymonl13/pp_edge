@@ -28,7 +28,7 @@ try:
     rows=max(0,sum(1 for _ in fh)-1)
 except Exception:
   rows=0
-open(f"rollup_probe_{d}.json","w").write(json.dumps({"day":d,"edge_rows":rows}))
+open(f"rollup_probe_{d}.json","w").write(json.dumps({'day':d,'edge_rows':rows}))
 PY
       - name: Upload rollup_probe
         uses: actions/upload-artifact@v4
@@ -51,11 +51,11 @@ PY
       - name: Calibration probe
         run: |
           set -e
-          python - <<'PY'
+          python - <<'PYCAL'
 import json,os
 d=os.environ.get('DAY') or ''
 open(f"calibration_{d}.json","w").write(json.dumps({"day":d,"join_rows":0,"brier":None,"logloss":None}))
-PY
+PYCAL
       - name: Upload calibration
         uses: actions/upload-artifact@v4
         with:
@@ -65,11 +65,11 @@ PY
       - name: Drift probe
         run: |
           set -e
-          python - <<'PY'
+          python - <<'PYDRIFT'
 import json,os
 d=os.environ.get('DAY') or ''
 open(f"drift_{d}.json","w").write(json.dumps({"day":d,"psi":None,"ref_days":0,"rows_current":None,"rows_ref":None}))
-PY
+PYDRIFT
       - name: Upload drift
         uses: actions/upload-artifact@v4
         with:
