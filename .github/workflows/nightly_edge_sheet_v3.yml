@@ -9,18 +9,67 @@ jobs:
   nightly:
     runs-on: ubuntu-latest
     steps:
-      - name: Echo
-        run: echo NIGHTLY_V3_OK
-
+      - name: Resolve DAY
+        id: day
+        run: |
+          set -e
+          D="$(date -u +%F)"
+          echo "DAY=$D" >> "$GITHUB_ENV"
+          echo "day=$D" >> "$GITHUB_OUTPUT"
+      - name: Rollup probe
+        run: |
+          set -e
+          python - <<'PY'
+import json,os
+d=os.environ.get('DAY') or ''
+rows=0
+try:
+  with open(f"edge_sheet_{d}.csv") as fh:
+    rows=max(0,sum(1 for _ in fh)-1)
+except Exception:
+  rows=0
+open(f"rollup_probe_{d}.json","w").write(json.dumps({"day":d,"edge_rows":rows}))
+PY
+      - name: Upload rollup_probe
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollup_probe
+          path: rollup_probe_${{ steps.day.outputs.day }}.json
+          if-no-files-found: warn
+      - name: Upload outcomes
+        uses: actions/upload-artifact@v4
+        with:
+          name: outcomes
+          path: outcomes/**
+          if-no-files-found: warn
+      - name: Upload edgesheet
+        uses: actions/upload-artifact@v4
+        with:
+          name: edgesheet
+          path: edge_sheet_*.csv
+          if-no-files-found: warn
+      - name: Calibration probe
+        run: |
+          set -e
+          python - <<'PY'
+import json,os
+d=os.environ.get('DAY') or ''
+open(f"calibration_{d}.json","w").write(json.dumps({"day":d,"join_rows":0,"brier":None,"logloss":None}))
+PY
+      - name: Upload calibration
+        uses: actions/upload-artifact@v4
+        with:
+          name: calibration
+          path: calibration_${{ steps.day.outputs.day }}.json
+          if-no-files-found: warn
       - name: Drift probe
         run: |
           set -e
-          python - <<'PY4'
+          python - <<'PY'
 import json,os
 d=os.environ.get('DAY') or ''
-# placeholder drift payload
 open(f"drift_{d}.json","w").write(json.dumps({"day":d,"psi":None,"ref_days":0,"rows_current":None,"rows_ref":None}))
-PY4
+PY
       - name: Upload drift
         uses: actions/upload-artifact@v4
         with:
