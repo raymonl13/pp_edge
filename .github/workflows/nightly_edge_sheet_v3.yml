@@ -5,78 +5,84 @@ on:
     paths:
       - .github/workflows/nightly_edge_sheet_v3.yml
       - .github/nightly_v3_kick.txt
+
 jobs:
   nightly:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Install deps
-        run: |
-          set -e
-          python -m pip install --upgrade pip
-          pip install pandas pyarrow pyyaml
+        run: python -m pip install --upgrade pip && pip install pandas pyyaml requests joblib
 
       - name: Resolve DAY
-        id: day
-        run: |
-          set -e
-          D="$(date -u +%F)"
-          echo "DAY=$D" >> "$GITHUB_ENV"
-          echo "day=$D" >> "$GITHUB_OUTPUT"
+        run: echo "DAY=$(date -u +%F)" >> "$GITHUB_ENV"
 
-      - name: Rollup probe
-        run: |
-          set -e
-          F="edge_sheet_${DAY}.csv"
-          ROWS=0
-          if [ -s "$F" ]; then ROWS=$(wc -l < "$F"); ROWS=$((ROWS>0?ROWS-1:0)); fi
-          printf '{"day":"%s","edge_rows":%s}\n' "$DAY" "$ROWS" > "rollup_probe_${DAY}.json"
+      - name: Fetch board
+        run: python code_data_ingest_pricefix_v1.py --date "$DAY" --state TX
 
-      - name: Upload rollup_probe
-        uses: actions/upload-artifact@v4
-        with:
-          name: rollup_probe
-          path: rollup_probe_${{ steps.day.outputs.day }}.json
-          if-no-files-found: warn
-
-      - name: Upload outcomes
-        uses: actions/upload-artifact@v4
-        with:
-          name: outcomes
-          path: outcomes/**
-          if-no-files-found: warn
+      - name: Build edge sheet
+        run: python code_cli_run_edge_sheet_v1.py --date "$DAY" --cfg config_pp_edge_v6.8.yaml
 
       - name: Upload edgesheet
         uses: actions/upload-artifact@v4
         with:
           name: edgesheet
-          path: edge_sheet_*.csv
+          path: edge_sheet_${{ env.DAY }}.csv
+          if-no-files-found: warn
+
+      - name: Rollup probe
+        run: python scripts/rollup_probe.py --day "$DAY" --out "rollup_probe_${DAY}.json"
+
+      - name: Upload rollup_probe
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollup_probe
+          path: rollup_probe_${{ env.DAY }}.json
           if-no-files-found: warn
 
       - name: Calibration probe
-        run: |
-          set -e
-          python scripts/calibration_probe.py "$DAY" > "calibration_${DAY}.json"
+        run: python scripts/calibration_probe.py --day "$DAY" --out "calibration_${DAY}.json"
 
       - name: Upload calibration
         uses: actions/upload-artifact@v4
         with:
           name: calibration
-          path: calibration_${{ steps.day.outputs.day }}.json
+          path: calibration_${{ env.DAY }}.json
           if-no-files-found: warn
 
       - name: Drift probe
-        run: |
-          set -e
-          python scripts/drift_probe.py "$DAY" > "drift_${DAY}.json"
+        run: python scripts/drift_probe.py --day "$DAY" --out "drift_${DAY}.json"
 
       - name: Upload drift
         uses: actions/upload-artifact@v4
         with:
           name: drift
-          path: drift_${{ steps.day.outputs.day }}.json
+          path: drift_${{ env.DAY }}.json
+          if-no-files-found: warn
+
+      - name: Calibration trend
+        run: python scripts/calibration_rollup.py --glob "calibration_*.json" --outdir "calibration_trend"
+
+      - name: Upload calibration trend
+        uses: actions/upload-artifact@v4
+        with:
+          name: calibration_trend
+          path: calibration_trend/*
+          if-no-files-found: warn
+
+      - name: Drift SLO guard
+        run: python scripts/drift_guard.py --glob "drift_*.json" --slo "ci/slo.yaml" --outdir "drift_trend"
+
+      - name: Upload drift trend
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift_trend
+          path: drift_trend/*
           if-no-files-found: warn
