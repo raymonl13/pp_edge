@@ -1,5 +1,4 @@
 name: nightly_edge_sheet
-
 on:
   schedule:
     - cron: "0 8 * * *"
@@ -8,25 +7,20 @@ on:
     paths:
       - .github/workflows/nightly_edge_sheet.yml
       - .github/nightly_kick.txt
-
 jobs:
   nightly:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
       - name: Install deps
         run: python -m pip install --upgrade pip && pip install pandas pyyaml requests joblib
-
       - name: Resolve DAY
         run: echo "DAY=$(date -u +%F)" >> "$GITHUB_ENV"
-
       - name: Fetch board with fallback
         run: |
           set -e
@@ -37,68 +31,99 @@ jobs:
           else
             echo "SEEDED_BOARD=0" >> "$GITHUB_ENV"
           fi
-
       - name: Build edge sheet if not seeded
         run: test -s "edge_sheet_${DAY}.csv" || python code_cli_run_edge_sheet_v1.py --date "$DAY" --cfg config_pp_edge_v6.8.yaml
-
       - name: Outcomes (optional)
         run: |
           set -e
           python scripts/ci_fetch_outcomes.py --day "$DAY" || true
-
       - name: Upload edgesheet
         uses: actions/upload-artifact@v4
         with:
           name: edgesheet
           path: edge_sheet_${{ env.DAY }}.csv
           if-no-files-found: warn
-
       - name: Rollup probe
         run: python scripts/rollup_probe.py --day "$DAY" --out "rollup_probe_${DAY}.json"
-
       - name: Upload rollup_probe
         uses: actions/upload-artifact@v4
         with:
           name: rollup_probe
           path: rollup_probe_${{ env.DAY }}.json
           if-no-files-found: warn
-
       - name: Calibration probe
         run: python scripts/calibration_probe.py --day "$DAY" --out "calibration_${DAY}.json"
-
       - name: Upload calibration
         uses: actions/upload-artifact@v4
         with:
           name: calibration
           path: calibration_${{ env.DAY }}.json
           if-no-files-found: warn
-
       - name: Drift probe
         run: python scripts/drift_probe.py --day "$DAY" --out "drift_${DAY}.json"
-
       - name: Upload drift
         uses: actions/upload-artifact@v4
         with:
           name: drift
           path: drift_${{ env.DAY }}.json
           if-no-files-found: warn
-
       - name: Calibration trend
         run: python scripts/calibration_rollup.py --glob "calibration_*.json" --outdir "calibration_trend"
-
       - name: Upload calibration trend
         uses: actions/upload-artifact@v4
         with:
           name: calibration_trend
           path: calibration_trend/*
           if-no-files-found: warn
-
       - name: Drift SLO guard
         run: python scripts/drift_guard.py --glob "drift_*.json" --slo "ci/slo.yaml" --outdir "drift_trend"
-
       - name: Upload drift trend
         uses: actions/upload-artifact@v4
         with:
           name: drift_trend
           path: drift_trend/*
           if-no-files-found: warn
+      - name: Local verify gate
+        run: |
+          python - <<'PY'
+import pandas as pd, os, json
+d=os.environ["DAY"]
+ok=True
+p1=f"edge_sheet_{d}.csv"
+ok = ok and os.path.exists(p1) and len(pd.read_csv(p1))>=2
+open("gate_OK.txt","w").write("1" if ok else "0")
+PY
+      - name: Build slips (gated)
+        if: always()
+        run: |
+          test "$(cat gate_OK.txt)" = "1" || exit 0
+          python scripts/make_slips_from_edges.py edge_sheet_${DAY}.csv
+          python scripts/slip_qa_uniqueness.py slips_manual.json > slips_report.txt
+          echo "DONE" > slips_built.txt
+      - name: Upload slips
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: slips
+          path: |
+            slips_manual.*
+            slips_report.txt
+            slips_built.txt
+          if-no-files-found: warn
+      - name: Final banners
+        if: always()
+        run: |
+          test -f calibration_trend/trend.csv && python - <<'PY'
+import pandas as pd
+d=pd.read_csv("calibration_trend/trend.csv")
+b=float(d["brier"].tail(7).dropna().mean()) if "brier" in d.columns else None
+j=int(d["n_joined"].tail(1).fillna(0).values[0]) if "n_joined" in d.columns else 0
+print(f"[cal] brier_7d={b} join_last={j}")
+PY
+          test -f drift_trend/trend.csv && python - <<'PY'
+import pandas as pd, math
+d=pd.read_csv("drift_trend/trend.csv")
+v=float(d["psi"].tail(1).dropna().values[0]) if "psi" in d.columns and d["psi"].tail(1).notna().all() else None
+st="OK" if v is None else ("OK" if v<0.1 else "WARN" if v<0.2 else "FAIL")
+print(f"[drift] psi={v} state={st}")
+PY
