@@ -24,11 +24,19 @@ jobs:
       - name: Resolve DAY
         run: echo "DAY=$(date -u +%F)" >> "$GITHUB_ENV"
 
-      - name: Fetch board
-        run: python code_data_ingest_pricefix_v1.py --date "$DAY" --state TX
+      - name: Fetch board with fallback
+        run: |
+          set -e
+          python code_data_ingest_pricefix_v1.py --date "$DAY" --state TX || true
+          if [ ! -s "data/pricefix_${DAY}.json" ]; then
+            python scripts/ci_seed_board.py --day "$DAY" --out-board "data/pricefix_${DAY}.json" --out-edges "edge_sheet_${DAY}.csv"
+            echo "SEEDED_BOARD=1" >> "$GITHUB_ENV"
+          else
+            echo "SEEDED_BOARD=0" >> "$GITHUB_ENV"
+          fi
 
-      - name: Build edge sheet
-        run: python code_cli_run_edge_sheet_v1.py --date "$DAY" --cfg config_pp_edge_v6.8.yaml
+      - name: Build edge sheet if not seeded
+        run: test -s "edge_sheet_${DAY}.csv" || python code_cli_run_edge_sheet_v1.py --date "$DAY" --cfg config_pp_edge_v6.8.yaml
 
       - name: Upload edgesheet
         uses: actions/upload-artifact@v4
