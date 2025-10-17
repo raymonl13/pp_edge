@@ -1,53 +1,88 @@
 #!/usr/bin/env python3
-import sys,json,pathlib,pandas as pd
-day=(sys.argv[1] if len(sys.argv)>1 else "").strip()
-out={"day":day or None,"join_rows":0,"brier":None,"logloss":None,"tried_keys":[],"used":None}
-if not day:
-    print(json.dumps(out)); sys.exit(0)
-es=pathlib.Path(f"edge_sheet_{day}.csv")
-rz=pathlib.Path(f"realized/realized_{day}.csv")
-if not es.exists() or not rz.exists():
-    print(json.dumps(out)); sys.exit(0)
-dfp=pd.read_csv(es)
-dfr=pd.read_csv(rz)
-pcol="p" if "p" in dfp.columns else ("p_hit" if "p_hit" in dfp.columns else None)
-if pcol is None:
-    print(json.dumps(out)); sys.exit(0)
-keys=None
-tries=[]
-if "leg_id" in dfp.columns and "leg_id" in dfr.columns:
-    tries.append(["leg_id"])
-elif all(c in dfp.columns for c in ["player","game_id"]) and all(c in dfr.columns for c in ["player","game_id"]):
-    tries.append(["player","game_id"])
-elif "game_id" in dfp.columns and "game_id" in dfr.columns:
-    tries.append(["game_id"])
-elif "leg_id" in dfr.columns and "leg_id" not in dfp.columns:
-    dfp=dfp.copy(); dfp["leg_id"]=[chr(ord("A")+i) for i in range(len(dfp))]; tries.append(["leg_id"])
-out["tried_keys"]=tries
-ok=False
-for cand in tries:
-    dfpp=dfp.copy(); dfr2=dfr.copy()
-    for k in cand:
-        if k in dfr2.columns: dfr2[k]=dfr2[k].astype(str).str.strip()
-        if k in dfpp.columns: dfpp[k]=dfpp[k].astype(str).str.strip()
-    left=dfr2[cand+["outcome"]].copy()
-    right=dfpp[cand+[pcol]].copy().rename(columns={pcol:"p"})
-    j=left.merge(right,on=cand,how="inner",validate="m:m")
-    if len(j)>0:
-        keys=cand; out["used"]=cand; ok=True; break
-if not ok:
-    print(json.dumps(out)); sys.exit(0)
-for k in keys:
-    if k in dfr.columns: dfr[k]=dfr[k].astype(str).str.strip()
-    if k in dfp.columns: dfp[k]=dfp[k].astype(str).str.strip()
-left=dfr[keys+["outcome"]].copy()
-right=dfp[keys+[pcol]].copy().rename(columns={pcol:"p"})
-j=left.merge(right,on=keys,how="inner",validate="m:m")
-out["join_rows"]=int(len(j))
-if len(j):
-    import numpy as np
-    p=j["p"].clip(1e-9,1-1e-9).astype(float).to_numpy()
-    y=j["outcome"].astype(float).to_numpy()
-    out["brier"]=float(((p-y)**2).mean())
-    out["logloss"]=float(-(y*np.log(p)+(1-y)*np.log(1-p)).mean())
-print(json.dumps(out))
+import argparse, datetime as dt, json, os, pandas as pd, sys, ast, yaml
+def _pick_prob(df):
+    for c in ["p_hit","prob","win_prob","p"]:
+        if c in df.columns: return c
+    return None
+def _load_labels(day):
+    r1=os.path.join("realized",f"realized_{day}.csv")
+    r2=os.path.join("data",f"outcomes_{day}.csv")
+    for path in (r1,r2):
+        if os.path.exists(path):
+            df=pd.read_csv(path)
+            if "y" in df.columns: return df,["leg_id","player","game_id","stat","line"]
+            if "outcome" in df.columns:
+                df=df.rename(columns={"outcome":"y"}); return df,["leg_id","player","game_id","stat","line"]
+            if "won" in df.columns:
+                df["y"]=df["won"].astype(int); return df,["leg_id","player","game_id","stat","line"]
+            if "result" in df.columns:
+                df["y"]=df["result"].astype(int); return df,["leg_id","player","game_id","stat","line"]
+    return None
+def _decode_legs_cell(s):
+    if isinstance(s,(list,tuple)): return list(s)
+    if not isinstance(s,str): return []
+    try:
+        obj=ast.literal_eval(s)
+        return obj if isinstance(obj,list) else []
+    except Exception:
+        try:
+            obj=yaml.safe_load(s)
+            return obj if isinstance(obj,list) else []
+        except Exception:
+            return []
+def _explode_legs(df):
+    if "legs" not in df.columns: return df
+    rows=[]
+    for s in df["legs"].dropna():
+        for d in _decode_legs_cell(s):
+            if isinstance(d,dict): rows.append(d)
+    return pd.DataFrame(rows) if rows else df
+def _norm_keys(df, keys):
+    out=df.copy()
+    for k in keys:
+        if k in out.columns:
+            s=out[k].astype(str)
+            s=s.replace({"nan":"","None":""})
+            s=s.str.strip()
+            out[k]=s
+    return out
+def _best_join(df, labdf, prob_col):
+    cands=[["leg_id","player","game_id","stat","line"],["player","game_id","stat","line"],["player","stat","line"],["player","stat"],["player","line"],["player"]]
+    for ks in cands:
+        ok=[k for k in ks if k in df.columns and k in labdf.columns]
+        if not ok: continue
+        l=_norm_keys(df, ok)
+        r=_norm_keys(labdf, ok+["y"])
+        j=l.merge(r[ok+["y"]], on=ok, how="inner").dropna(subset=[prob_col,"y"])
+        if len(j)>0: return j, ok
+    return None, []
+def main():
+    p=argparse.ArgumentParser()
+    p.add_argument("--day"); p.add_argument("--edges"); p.add_argument("--out")
+    a=p.parse_args()
+    day=a.day or dt.date.today().isoformat()
+    edges=a.edges or f"edge_sheet_{day}.csv"
+    out=a.out or f"calibration_{day}.json"
+    payload={"day":day,"n_rows":0,"pred_col":None,"avg_pred":None,"brier":None,"n_joined":0,"join_keys":[]}
+    if os.path.exists(edges):
+        df=pd.read_csv(edges)
+        df=_explode_legs(df)
+        payload["n_rows"]=int(len(df))
+        col=_pick_prob(df)
+        payload["pred_col"]=col
+        if col is not None and len(df):
+            pcol=pd.to_numeric(df[col],errors="coerce").clip(0,1)
+            payload["avg_pred"]=float(pcol.mean())
+            lab=_load_labels(day)
+            if lab:
+                labdf,_=lab
+                j,used=_best_join(df, labdf, col)
+                if j is not None:
+                    y=j["y"].astype(int).clip(0,1)
+                    ph=pd.to_numeric(j[col],errors="coerce").clip(0,1)
+                    payload["brier"]=float(((ph-y).pow(2)).mean())
+                    payload["n_joined"]=int(len(j))
+                    payload["join_keys"]=used
+    with open(out,"w") as f: json.dump(payload,f)
+    print(out)
+if __name__=="__main__": sys.exit(main())
