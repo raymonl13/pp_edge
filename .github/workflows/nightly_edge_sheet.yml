@@ -93,16 +93,9 @@ jobs:
           path: drift_trend/*
           if-no-files-found: warn
       - name: Local verify gate
-        run: |
-          python - <<'PY'
-import pandas as pd, os, json
-d=os.environ["DAY"]
-ok=True
-p1=f"edge_sheet_{d}.csv"
-ok = ok and os.path.exists(p1) and len(pd.read_csv(p1))>=2
-open("gate_OK.txt","w").write("1" if ok else "0")
-PY
-      - name: Build slips (gated)
+  run: python -c 'import os,sys,pandas as pd; d=os.environ.get("DAY"); p=f"edge_sheet_{d}.csv"; ok=(pd.read_csv(p).shape[0]>=2) if os.path.exists(p) else False; open("gate_OK.txt","w").write("1" if ok else "0")'
+- name: Build slips (gated)
+
         if: always()
         run: |
           test "$(cat gate_OK.txt)" = "1" || exit 0
