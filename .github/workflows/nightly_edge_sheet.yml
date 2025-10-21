@@ -155,3 +155,7 @@ jobs:
         name: outcomes_rollup
         path: outcomes_rollup
         if-no-files-found: warn
+'on':
+  workflow_dispatch: {}
+  schedule:
+  - cron: 0 9 * * *
