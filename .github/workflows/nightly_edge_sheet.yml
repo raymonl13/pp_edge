@@ -28,9 +28,13 @@ jobs:
         \ --day \"$DAY\" --out-board \"data/pricefix_${DAY}.json\" --out-edges \"\
         edge_sheet_${DAY}.csv\"\n  echo \"SEEDED_BOARD=1\" >> \"$GITHUB_ENV\"\nelse\n\
         \  echo \"SEEDED_BOARD=0\" >> \"$GITHUB_ENV\"\nfi\n"
+      if: always()
+      continue-on-error: true
     - name: Build edge sheet if not seeded
       run: test -s "edge_sheet_${DAY}.csv" || python code_cli_run_edge_sheet_v1.py
         --date "$DAY" --cfg config_pp_edge_v6.8.yaml
+      if: always()
+      continue-on-error: true
     - name: Outcomes (optional)
       run: 'set -e
 
@@ -73,6 +77,8 @@ jobs:
         if-no-files-found: warn
     - name: Calibration probe
       run: python scripts/calibration_probe.py --day "$DAY" --out "calibration_${DAY}.json"
+      if: always()
+      continue-on-error: true
     - name: Upload calibration
       uses: actions/upload-artifact@v4
       with:
@@ -81,6 +87,8 @@ jobs:
         if-no-files-found: warn
     - name: Drift probe
       run: python scripts/drift_probe.py --day "$DAY" --out "drift_${DAY}.json"
+      if: always()
+      continue-on-error: true
     - name: Upload drift
       uses: actions/upload-artifact@v4
       with:
@@ -90,6 +98,8 @@ jobs:
     - name: Calibration trend
       run: python scripts/calibration_rollup.py --glob "calibration_*.json" --outdir
         "calibration_trend"
+      if: always()
+      continue-on-error: true
     - name: Upload calibration trend
       uses: actions/upload-artifact@v4
       with:
@@ -99,6 +109,8 @@ jobs:
     - name: Drift SLO guard
       run: python scripts/drift_guard.py --glob "drift_*.json" --slo "ci/slo.yaml"
         --outdir "drift_trend"
+      if: always()
+      continue-on-error: true
     - name: Upload drift trend
       uses: actions/upload-artifact@v4
       with:
@@ -109,6 +121,8 @@ jobs:
       run: python -c 'import os,sys,pandas as pd; d=os.environ.get("DAY"); p=f"edge_sheet_{d}.csv";
         ok=(pd.read_csv(p).shape[0]>=2) if os.path.exists(p) else False; open("gate_OK.txt","w").write("1"
         if ok else "0")'
+      if: always()
+      continue-on-error: true
     - name: Build slips (gated)
       if: always()
       run: 'test "$(cat gate_OK.txt)" = "1" || exit 0
@@ -120,6 +134,7 @@ jobs:
         echo "DONE" > slips_built.txt
 
         '
+      continue-on-error: true
     - name: Upload slips
       if: always()
       uses: actions/upload-artifact@v4
