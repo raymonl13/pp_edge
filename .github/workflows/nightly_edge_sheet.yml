@@ -43,6 +43,15 @@ jobs:
           name: edgesheet
           path: edge_sheet_${{ env.DAY }}.csv
           if-no-files-found: warn
+      - name: Ensure model file
+        run: test -s model_v2.pkl || echo "model_v2_missing" > model_warn.txt
+      - name: Upload model warn
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: model_warn
+          path: model_warn.txt
+          if-no-files-found: warn
       - name: Rollup probe
         run: python scripts/rollup_probe.py --day "$DAY" --out "rollup_probe_${DAY}.json"
       - name: Upload rollup_probe
