@@ -1,12 +1,4 @@
 name: nightly_edge_sheet
-true:
-  schedule:
-  - cron: 0 8 * * *
-  workflow_dispatch: null
-  push:
-    paths:
-    - .github/workflows/nightly_edge_sheet.yml
-    - .github/nightly_kick.txt
 jobs:
   nightly:
     runs-on: ubuntu-latest
