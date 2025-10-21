@@ -156,6 +156,7 @@ jobs:
         path: outcomes_rollup
         if-no-files-found: warn
 'on':
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs: {}
   schedule:
   - cron: 0 9 * * *
