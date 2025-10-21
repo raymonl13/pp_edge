@@ -93,9 +93,8 @@ jobs:
           path: drift_trend/*
           if-no-files-found: warn
       - name: Local verify gate
-  run: python -c 'import os,sys,pandas as pd; d=os.environ.get("DAY"); p=f"edge_sheet_{d}.csv"; ok=(pd.read_csv(p).shape[0]>=2) if os.path.exists(p) else False; open("gate_OK.txt","w").write("1" if ok else "0")'
-- name: Build slips (gated)
-
+        run: python -c 'import os,sys,pandas as pd; d=os.environ.get("DAY"); p=f"edge_sheet_{d}.csv"; ok=(pd.read_csv(p).shape[0]>=2) if os.path.exists(p) else False; open("gate_OK.txt","w").write("1" if ok else "0")'
+      - name: Build slips (gated)
         if: always()
         run: |
           test "$(cat gate_OK.txt)" = "1" || exit 0
@@ -111,21 +110,3 @@ jobs:
             slips_manual.*
             slips_report.txt
             slips_built.txt
-          if-no-files-found: warn
-      - name: Final banners
-        if: always()
-        run: |
-          test -f calibration_trend/trend.csv && python - <<'PY'
-import pandas as pd
-d=pd.read_csv("calibration_trend/trend.csv")
-b=float(d["brier"].tail(7).dropna().mean()) if "brier" in d.columns else None
-j=int(d["n_joined"].tail(1).fillna(0).values[0]) if "n_joined" in d.columns else 0
-print(f"[cal] brier_7d={b} join_last={j}")
-PY
-          test -f drift_trend/trend.csv && python - <<'PY'
-import pandas as pd, math
-d=pd.read_csv("drift_trend/trend.csv")
-v=float(d["psi"].tail(1).dropna().values[0]) if "psi" in d.columns and d["psi"].tail(1).notna().all() else None
-st="OK" if v is None else ("OK" if v<0.1 else "WARN" if v<0.2 else "FAIL")
-print(f"[drift] psi={v} state={st}")
-PY
