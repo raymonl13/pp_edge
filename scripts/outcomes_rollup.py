@@ -1,118 +1,57 @@
 #!/usr/bin/env python3
-import argparse, json, glob, pathlib
-from typing import Optional, Tuple
+import argparse, os, sys, glob, math
 import pandas as pd
-
-def _load_probs_from_edge_sheet(day: str) -> Optional[pd.DataFrame]:
-    p = pathlib.Path(f"edge_sheet_{day}.csv")
-    if not p.exists():
-        return None
-    df = pd.read_csv(p)
-    id_col = None
-    for c in ["leg_id","game_id","player"]:
-        if c in df.columns:
-            id_col = c
-            break
-    prob_col = "p" if "p" in df.columns else ("p_hit" if "p_hit" in df.columns else None)
-    if id_col is None or prob_col is None:
-        return None
-    out = df[[id_col, prob_col]].copy()
-    out.columns = ["leg_id","p"]
-    out["leg_id"] = out["leg_id"].astype(str).str.strip()
-    return out
-
-def _brier_and_logloss(y_true: pd.Series, p: pd.Series) -> Tuple[float,float]:
-    import numpy as np
-    p = p.clip(1e-9, 1-1e-9).astype(float)
-    y = y_true.astype(float)
-    brier = float(((p - y)**2).mean())
-    ll = float(-(y*np.log(p) + (1-y)*np.log(1-p)).mean())
-    return brier, ll
-
-def build_rollup(outcomes_glob: str, realized_glob: str, out_csv: str, out_json: str):
-    realized_files = sorted(glob.glob(realized_glob))
-    realized_by_day = {}
-    for rp in realized_files:
-        day = pathlib.Path(rp).stem.split("_")[-1]
-        df = pd.read_csv(rp)
-        if "leg_id" in df.columns:
-            df["leg_id"] = df["leg_id"].astype(str).str.strip()
-        realized_by_day[day] = df
-
-    daily = []
-    for day, df_r in sorted(realized_by_day.items()):
-        staked = float(df_r["stake"].sum()) if "stake" in df_r.columns else 0.0
-        payout = float(df_r["payout"].sum()) if "payout" in df_r.columns else 0.0
-        roi = None if staked == 0 else (payout - staked) / staked
-
-        probs = _load_probs_from_edge_sheet(day)
-        brier = None
-        logloss = None
-        if probs is not None and "leg_id" in df_r.columns:
-            j = pd.merge(df_r[["leg_id","outcome"]], probs, on="leg_id", how="inner")
-            if not j.empty:
-                brier, logloss = _brier_and_logloss(j["outcome"], j["p"])
-
-        daily.append({
-            "date": day,
-            "total_legs": int(len(df_r)),
-            "total_staked": float(staked),
-            "total_payout": float(payout),
-            "roi": None if roi is None else float(round(roi, 6)),
-            "brier": None if brier is None else float(round(brier, 6)),
-            "logloss": None if logloss is None else float(round(logloss, 6)),
-        })
-
-    pathlib.Path("outcomes").mkdir(parents=True, exist_ok=True)
-
-    if not daily:
-        pd.DataFrame(daily).to_csv(out_csv, index=False)
-        pathlib.Path(out_json).write_text(json.dumps({"days": 0, "trailing": {}, "latest": {}}, indent=2))
-        print("[rollup] days=0 roi=None brier=None")
-        print("WROTE_CSV", out_csv, pathlib.Path(out_csv).exists(), pathlib.Path(out_csv).stat().st_size if pathlib.Path(out_csv).exists() else -1)
-        print("WROTE_JSON", out_json)
-        return 0, None, None
-
-    df = pd.DataFrame(daily).sort_values("date")
-    df.to_csv(out_csv, index=False)
-
-    def trailing(k: int) -> dict:
-        t = df.tail(k)
-        st = float(t["total_staked"].sum())
-        py = float(t["total_payout"].sum())
-        troi = None if st == 0 else (py - st) / st
-        tbrier = None if t["brier"].dropna().empty else float(t["brier"].mean())
-        tlog = None if t["logloss"].dropna().empty else float(t["logloss"].mean())
-        return {"days": int(len(t)), "roi": None if troi is None else float(round(troi, 6)), "brier": tbrier, "logloss": tlog}
-
-    t7 = trailing(7)
-    t30 = trailing(30)
-    latest = df.iloc[-1].to_dict()
-    pathlib.Path(out_json).write_text(json.dumps({"days": int(len(df)), "trailing": {"d7": t7, "d30": t30}, "latest": latest}, indent=2))
-
-    rep_roi = t30["roi"] if t30["roi"] is not None else (t7["roi"] if t7["roi"] is not None else latest.get("roi"))
-    rep_brier = t30["brier"] if t30["brier"] is not None else (t7["brier"] if t7["brier"] is not None else latest.get("brier"))
-    print(f"[rollup] days={len(df)} roi={rep_roi} brier={rep_brier}")
-    print("WROTE_CSV", out_csv, pathlib.Path(out_csv).exists(), pathlib.Path(out_csv).stat().st_size if pathlib.Path(out_csv).exists() else -1)
-    print("WROTE_JSON", out_json)
-    return len(df), rep_roi, rep_brier
-
+import numpy as np
+def list_joined(outdir): return sorted(glob.glob(f"{outdir}/day=*/joined.csv"))
+def safe_brier(p,y):
+    m=p.notna() & y.notna()
+    if not m.any(): return float("nan")
+    return float(((p[m]-y[m])**2).mean())
+def safe_logloss(p,y,eps=1e-12):
+    m=p.notna() & y.notna()
+    if not m.any(): return float("nan")
+    p=p[m].clip(eps,1-eps); y=y[m]
+    return float((-(y*np.log(p)+(1-y)*np.log(1-p))).mean())
+def summarize_day(path):
+    d=path.split("day=")[1].split("/")[0]
+    try: df=pd.read_csv(path)
+    except Exception: return {"day":d,"n_total":0,"n_joined":0,"n_pending":0,"roi_units":float("nan"),"roi_per_bet":float("nan"),"brier":float("nan"),"logloss":float("nan")}
+    n_total=len(df); m=df["y"].isin([0,1]); n_joined=int(m.sum()); n_pending=int(df["y"].isna().sum())
+    roi_units=float(df.loc[m,"profit_units"].sum()) if "profit_units" in df.columns else float("nan")
+    roi_per_bet=float(df.loc[m,"profit_units"].mean()) if ("profit_units" in df.columns and n_joined>0) else float("nan")
+    p_col="p_cal" if "p_cal" in df.columns else ("p_raw" if "p_raw" in df.columns else None)
+    if p_col:
+        brier=safe_brier(df[p_col],df["y"]); logloss=safe_logloss(df[p_col],df["y"])
+    else:
+        brier=float("nan"); logloss=float("nan")
+    return {"day":d,"n_total":int(n_total),"n_joined":int(n_joined),"n_pending":int(n_pending),"roi_units":roi_units,"roi_per_bet":roi_per_bet,"brier":brier,"logloss":logloss}
+def trailing(daily,days):
+    if daily.empty: return {"window":days,"n_joined":0,"roi_units":float("nan"),"roi_per_bet":float("nan"),"brier":float("nan"),"logloss":float("nan")}
+    tail=daily.tail(days).copy()
+    joined_mask=tail["n_joined"]>0
+    w=tail.loc[joined_mask,"n_joined"]
+    brier=float(np.average(tail.loc[joined_mask,"brier"],weights=w)) if joined_mask.any() else float("nan")
+    logloss=float(np.average(tail.loc[joined_mask,"logloss"],weights=w)) if joined_mask.any() else float("nan")
+    return {"window":days,"n_joined":int(tail["n_joined"].sum()),"roi_units":float(tail["roi_units"].sum()),"roi_per_bet":float((tail["roi_units"].sum()/tail["n_joined"].sum()) if tail["n_joined"].sum()>0 else float("nan")),"brier":brier,"logloss":logloss}
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--outcomes_glob", default="outcomes/outcomes_*.jsonl")
-    ap.add_argument("--realized_glob", default="realized/realized_*.csv")
-    ap.add_argument("--out_csv", default="outcomes/outcomes_rollup.csv")
-    ap.add_argument("--out_json", default="outcomes/outcomes_rollup.json")
-    args = ap.parse_args()
-    build_rollup(args.outcomes_glob, args.realized_glob, args.out_csv, args.out_json)
-
-if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        pathlib.Path("outcomes").mkdir(parents=True, exist_ok=True)
-        pathlib.Path("outcomes/outcomes_rollup.csv").write_text("")
-        pathlib.Path("outcomes/outcomes_rollup.json").write_text(json.dumps({"days": 0, "error": str(e)}, indent=2))
-        print("[rollup] days=0 roi=None brier=None")
-        print("WROTE_CSV", "outcomes/outcomes_rollup.csv", pathlib.Path("outcomes/outcomes_rollup.csv").exists(), pathlib.Path("outcomes/outcomes_rollup.csv").stat().st_size if pathlib.Path("outcomes/outcomes_rollup.csv").exists() else -1)
-        print("WROTE_JSON", "outcomes/outcomes_rollup.json")
+    p=argparse.ArgumentParser(description="Aggregate outcomes → daily metrics and trailing windows")
+    p.add_argument("--outdir",default="outcomes"); p.add_argument("--artifact-dir",default="outcomes_rollup"); p.add_argument("--days",type=int,default=30)
+    args=p.parse_args()
+    os.makedirs(args.artifact_dir,exist_ok=True)
+    paths=list_joined(args.outdir)
+    if not paths:
+        pd.DataFrame(columns=["day","n_total","n_joined","n_pending","roi_units","roi_per_bet","brier","logloss"]).to_csv(f"{args.artifact_dir}/metrics_daily.csv",index=False)
+        open(f"{args.artifact_dir}/summary.txt","w").write("outcomes_rollup no-data\n")
+        print("outcomes_rollup D=none n=0 joined=0 pending=0 roi=nan brier=nan logloss=nan t7_roi=nan t30_roi=nan")
+        sys.exit(0)
+    daily=pd.DataFrame([summarize_day(p) for p in paths])
+    daily["day"]=pd.to_datetime(daily["day"])
+    daily=daily.sort_values("day")
+    daily.to_csv(f"{args.artifact_dir}/metrics_daily.csv",index=False)
+    t7=trailing(daily,7); t30=trailing(daily,30)
+    pd.DataFrame([t7,t30]).to_csv(f"{args.artifact_dir}/metrics_trailing.csv",index=False)
+    latest=daily.iloc[-1].to_dict()
+    line=f"outcomes_rollup D={latest['day'].date()} n={int(latest['n_total'])} joined={int(latest['n_joined'])} pending={int(latest['n_pending'])} roi={(latest['roi_per_bet'] if not math.isnan(latest['roi_per_bet']) else float('nan')):+.3f} brier={(latest['brier'] if not math.isnan(latest['brier']) else float('nan')):.3f} logloss={(latest['logloss'] if not math.isnan(latest['logloss']) else float('nan')):.3f} t7_roi={t7['roi_units']:+.2f} t30_roi={t30['roi_units']:+.2f}"
+    open(f"{args.artifact_dir}/summary.txt","w").write(line+"\n")
+    print(line)
+if __name__=="__main__": main()
