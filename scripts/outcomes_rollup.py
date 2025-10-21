@@ -50,7 +50,8 @@ def main():
     daily.to_csv(f"{args.artifact_dir}/metrics_daily.csv",index=False)
     t7=trailing(daily,7); t30=trailing(daily,30)
     pd.DataFrame([t7,t30]).to_csv(f"{args.artifact_dir}/metrics_trailing.csv",index=False)
-    latest=daily.iloc[-1].to_dict()
+    idx=(daily["n_total"]>0) | (daily["n_joined"]>0)
+    latest=(daily[idx].iloc[-1] if idx.any() else daily.iloc[-1]).to_dict()
     line=f"outcomes_rollup D={latest['day'].date()} n={int(latest['n_total'])} joined={int(latest['n_joined'])} pending={int(latest['n_pending'])} roi={(latest['roi_per_bet'] if not math.isnan(latest['roi_per_bet']) else float('nan')):+.3f} brier={(latest['brier'] if not math.isnan(latest['brier']) else float('nan')):.3f} logloss={(latest['logloss'] if not math.isnan(latest['logloss']) else float('nan')):.3f} t7_roi={t7['roi_units']:+.2f} t30_roi={t30['roi_units']:+.2f}"
     open(f"{args.artifact_dir}/summary.txt","w").write(line+"\n")
     print(line)
