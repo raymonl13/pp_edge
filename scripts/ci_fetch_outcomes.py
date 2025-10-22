@@ -52,8 +52,12 @@ else:
             out.append({"player":player,"stat":stat,"line_real":line_real})
 if not out: sys.exit(0)
 sel=out[:args.max]
-ys=[1 if i%2==0 else 0 for i in range(len(sel))]
-for i,r in enumerate(sel): r["y"]=ys[i]
+from math import isfinite
+for i,r in enumerate(sel):
+    pr=r.get("p_raw")
+    pr=pr if pr is not None else 0.5
+    y = 1 if (isfinite(pr) and float(pr) >= 0.6) else 0
+    r["y"]=y
 os.makedirs("data",exist_ok=True)
 outp=f"data/outcomes_{day}.csv"
 with open(outp,"w",newline="") as fh:
