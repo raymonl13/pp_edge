@@ -40,6 +40,13 @@ jobs:
     - name: Inspect rescued day (pre)
       if: always()
       run: ${PY:-python3} scripts/ci_inspect_pre.py || true
+    - name: Upload outcomes_data (pre)
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: outcomes_data_pre
+        path: outcomes
+        if-no-files-found: warn
     - name: Upload edgesheet
       uses: actions/upload-artifact@v4
       with:
@@ -70,6 +77,13 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: outcomes_data
+        path: outcomes
+        if-no-files-found: warn
+    - name: Upload outcomes_data (post)
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: outcomes_data_post
         path: outcomes
         if-no-files-found: warn
     - name: Ensure joined day
