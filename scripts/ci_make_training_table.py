@@ -184,8 +184,60 @@ def main():
 
         df=pd.DataFrame(rows)
         df["profit_units"]=np.where(df["y"].isin([0,1]), df["y"]*df["payout"]-1.0, np.nan)
-        df.to_csv(f"{args.outdir}/day={day}/joined.csv",index=False)
+    cal = None
+    import json, os
+    for cp in ("calibration/latest.json", f"calibration/{day}.json"):
+        if os.path.exists(cp):
+            try:
+                cal = json.load(open(cp)); break
+            except Exception:
+                pass
+    df["p_cal"] = apply_calibration(df.get("p_raw", pd.Series([np.nan]*len(df))), cal)
+
+    cal = None
+
+    import json, os
+
+    for cp in ("calibration/latest.json", f"calibration/{day}.json"):
+
+        if os.path.exists(cp):
+
+            try:
+
+                cal = json.load(open(cp)); break
+
+            except Exception:
+
+                pass
+
+    df["p_cal"] = apply_calibration(df.get("p_raw", pd.Series([np.nan]*len(df))), cal)
+
+    df.to_csv(f"{args.outdir}/day={day}/joined.csv", index=False)
         qc={"day":day,"n_total":int(len(df)),"n_joined":int(df["y"].isin([0,1]).sum()),"n_pending":int(df["y"].isna().sum()),"n_collisions":int(collisions),**meta}
         with open(f"{args.outdir}/day={day}/join_qc.json","w") as fh: json.dump(qc,fh)
         print(f"ci_make_training_table day={day} n_total={qc['n_total']} n_joined={qc['n_joined']} n_pending={qc['n_pending']} n_collisions={qc['n_collisions']}")
     pd.DataFrame(totals).to_csv(f"{args.outdir}/join_counts.csv",index=False)
+
+def apply_calibration(p, cal):
+    import numpy as np
+    if cal is None:
+        return p
+    m = cal.get("method")
+    if m == "platt":
+        a = float(cal.get("a", 1.0)); b = float(cal.get("b", 0.0))
+        z = a * p + b
+        return 1.0 / (1.0 + np.exp(-z))
+    if m == "isotonic" and "pairs" in cal:
+        pts = cal["pairs"]
+        xs = np.array([float(x) for x, _ in pts]); ys = np.array([float(y) for _, y in pts])
+        idx = np.argsort(xs); xs = xs[idx]; ys = ys[idx]
+        def interp(x):
+            if np.isnan(x): return np.nan
+            i = np.searchsorted(xs, x, side="left")
+            if i <= 0: return float(ys[0])
+            if i >= len(xs): return float(ys[-1])
+            x0, x1 = xs[i-1], xs[i]; y0, y1 = ys[i-1], ys[i]
+            t = (x - x0) / (x1 - x0) if x1 != x0 else 0.0
+            return float(y0 + t * (y1 - y0))
+        return p.apply(interp)
+    return p
