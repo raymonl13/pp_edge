@@ -14,8 +14,7 @@ def has_rows(p):
 
 def edge_path(day):
     for p in (f"edge_sheet_{day}.csv", f"artifacts/edge_sheet_{day}.csv", f"edges/edge_sheet_{day}.csv"):
-        if os.path.exists(p) and has_rows(p):
-            return p
+        if os.path.exists(p) and has_rows(p): return p
     return ""
 
 def latest_nonempty_edge_day():
@@ -23,8 +22,15 @@ def latest_nonempty_edge_day():
     for p in reversed(c):
         if has_rows(p):
             n=os.path.basename(p)
-            if n.startswith("edge_sheet_"):
-                return n.replace("edge_sheet_","").replace(".csv","")
+            if n.startswith("edge_sheet_"): return n.replace("edge_sheet_","").replace(".csv","")
+    return ""
+
+def latest_nonempty_outcomes_day():
+    c=sorted(glob.glob("data/outcomes_*.csv"))
+    for p in reversed(c):
+        if has_rows(p):
+            n=os.path.basename(p)
+            if n.startswith("outcomes_"): return n.replace("outcomes_","").replace(".csv","")
     return ""
 
 def build_edges(day):
@@ -37,9 +43,14 @@ def build_edges(day):
         subprocess.run([py,"code_cli_run_edge_sheet_v1.py","--date",day,"--cfg","config_pp_edge_v6.8.yaml"],check=False)
     return edge_path(day)
 
-def seed_outcomes(day, n="12"):
+def synth_edges_from_outcomes(day, limit="12"):
     py=os.environ.get("PY","python3")
-    subprocess.run([py,"scripts/ci_fetch_outcomes.py","--day",day,"--max",n],check=False)
+    subprocess.run([py,"scripts/ci_synthesize_edges_from_outcomes.py","--day",day,"--max",limit],check=False)
+    return edge_path(day)
+
+def seed_outcomes(day, limit="12"):
+    py=os.environ.get("PY","python3")
+    subprocess.run([py,"scripts/ci_fetch_outcomes.py","--day",day,"--max",limit],check=False)
 
 def rejoin_and_roll(day):
     py=os.environ.get("PY","python3")
@@ -54,29 +65,31 @@ def joined_sum(n=14):
         return 0
 
 day=os.environ.get("DAY","")
-cov=joined_sum(14)
-if cov>0:
-    print(f"ensure_joined_day ok joined_sum={cov}")
+if joined_sum(14)>0:
+    print("ensure_joined_day ok")
     sys.exit(0)
 
 target=day or datetime.utcnow().strftime("%Y-%m-%d")
 ep=edge_path(target) or build_edges(target)
 if not ep:
-    py=os.environ.get('PY','python3')
-    subprocess.run([py,'scripts/ci_synthesize_edges_from_outcomes.py','--day',target,'--max','12'],check=False)
-    ep=edge_path(target)
-    if not ep:
-        alt=latest_nonempty_edge_day()
+    alt=latest_nonempty_edge_day()
     if alt:
         target=alt
         ep=edge_path(target) or build_edges(target)
+
 if not ep:
-    print(f"ensure_joined_day no_edges_for={day or 'unset'} tried_build=true still_none")
+    alt_out=latest_nonempty_outcomes_day()
+    if alt_out:
+        target=alt_out
+    ep=synth_edges_from_outcomes(target,"12")
+
+if not ep:
+    print(f"ensure_joined_day no_edges_for={day or 'unset'} tried_build=true tried_synth=true still_none")
     sys.exit(0)
 
 seed_outcomes(target,"12")
 if not edge_path(target) or not has_rows(edge_path(target)):
-    subprocess.run([os.environ.get('PY','python3'),'scripts/ci_synthesize_edges_from_outcomes.py','--day',target,'--max','12'],check=False)
+    synth_edges_from_outcomes(target,"12")
+
 rejoin_and_roll(target)
-cov2=joined_sum(14)
-print(f"ensure_joined_day target={target} joined_sum_after={cov2}")
+print(f"ensure_joined_day target={target} joined_sum_after={joined_sum(14)}")
