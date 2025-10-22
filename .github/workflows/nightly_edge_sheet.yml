@@ -52,7 +52,7 @@ jobs:
         "$d" || true; done < outcomes_dates.txt
 
         ${PY:-python3} scripts/ci_fit_calibration.py --outdir outcomes --artifact
-        calibration --min_samples 5 || true
+        calibration --method isotonic --min_samples 5 || true
 
         ${PY:-python3} scripts/ci_make_training_table.py --date "$DAY" --outdir outcomes
         || true
