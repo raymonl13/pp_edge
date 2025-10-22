@@ -1,26 +1,28 @@
 #!/usr/bin/env python3
-import os, sys, glob, subprocess
+import os, sys, glob, subprocess, csv
 import pandas as pd
 from datetime import datetime
 
-def has_rows(p):
+def has_data_rows(p):
     try:
-        with open(p,'r') as f:
-            for i,_ in enumerate(f,1):
-                if i>1: return True
+        with open(p,'r') as fh:
+            dr=csv.DictReader(fh)
+            for row in dr:
+                if any(str(v).strip() for v in row.values()):
+                    return True
         return False
     except Exception:
         return False
 
 def edge_path(day):
     for p in (f"edge_sheet_{day}.csv", f"artifacts/edge_sheet_{day}.csv", f"edges/edge_sheet_{day}.csv"):
-        if os.path.exists(p) and has_rows(p): return p
+        if os.path.exists(p) and has_data_rows(p): return p
     return ""
 
 def latest_nonempty_edge_day():
     c=sorted(glob.glob("edge_sheet_*.csv")+glob.glob("artifacts/edge_sheet_*.csv")+glob.glob("edges/edge_sheet_*.csv"))
     for p in reversed(c):
-        if has_rows(p):
+        if has_data_rows(p):
             n=os.path.basename(p)
             if n.startswith("edge_sheet_"): return n.replace("edge_sheet_","").replace(".csv","")
     return ""
@@ -28,7 +30,7 @@ def latest_nonempty_edge_day():
 def latest_nonempty_outcomes_day():
     c=sorted(glob.glob("data/outcomes_*.csv"))
     for p in reversed(c):
-        if has_rows(p):
+        if has_data_rows(p):
             n=os.path.basename(p)
             if n.startswith("outcomes_"): return n.replace("outcomes_","").replace(".csv","")
     return ""
@@ -38,9 +40,6 @@ def build_edges(day):
     st=os.environ.get("STATE","TX")
     subprocess.run([py,"code_data_ingest_pricefix_v1.py","NAME=board","--date",day,"--state",st],check=False)
     subprocess.run([py,"code_cli_run_edge_sheet_v1.py","--date",day,"--cfg","config_pp_edge_v6.8.yaml"],check=False)
-    if not edge_path(day):
-        subprocess.run([py,"scripts/ci_seed_board.py","--day",day,"--out-board",f"data/pricefix_{day}.json","--out-edges",f"edge_sheet_{day}.csv"],check=False)
-        subprocess.run([py,"code_cli_run_edge_sheet_v1.py","--date",day,"--cfg","config_pp_edge_v6.8.yaml"],check=False)
     return edge_path(day)
 
 def synth_edges_from_outcomes(day, limit="12"):
@@ -76,19 +75,17 @@ if not ep:
     if alt:
         target=alt
         ep=edge_path(target) or build_edges(target)
-
 if not ep:
     alt_out=latest_nonempty_outcomes_day()
     if alt_out:
         target=alt_out
     ep=synth_edges_from_outcomes(target,"12")
-
 if not ep:
     print(f"ensure_joined_day no_edges_for={day or 'unset'} tried_build=true tried_synth=true still_none")
     sys.exit(0)
 
 seed_outcomes(target,"12")
-if not edge_path(target) or not has_rows(edge_path(target)):
+if not edge_path(target):
     synth_edges_from_outcomes(target,"12")
 
 rejoin_and_roll(target)
