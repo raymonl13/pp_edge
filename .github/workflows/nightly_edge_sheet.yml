@@ -49,6 +49,12 @@ jobs:
         while read -r d; do ${PY:-python3} scripts/ci_make_training_table.py --date
         "$d" || true; done < outcomes_dates.txt
 
+        ${PY:-python3} scripts/ci_fit_calibration.py --outdir outcomes --artifact
+        calibration --min_samples 5 || true
+
+        ${PY:-python3} scripts/ci_make_training_table.py --date "$DAY" --outdir outcomes
+        || true
+
         ${PY:-python3} scripts/outcomes_rollup.py --days 30'
     - name: Ensure model file
       run: test -s model_v2.pkl || echo "model_v2_missing" > model_warn.txt
@@ -146,6 +152,21 @@ jobs:
       with:
         name: outcomes_rollup
         path: outcomes_rollup
+        if-no-files-found: warn
+    - name: Model parity (post)
+      if: always()
+      run: 'if test -s model_v2.pkl; then printf ''{"state":"present","path":"model_v2.pkl"}
+
+        '' > model_parity_post.json; else printf ''{"state":"missing","reason":"not
+        found"}
+
+        '' > model_parity_post.json; fi'
+    - name: Upload model parity
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: model_parity_post
+        path: model_parity_post.json
         if-no-files-found: warn
 'on':
   workflow_dispatch:
