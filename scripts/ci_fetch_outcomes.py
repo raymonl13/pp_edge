@@ -57,6 +57,10 @@ for i,r in enumerate(sel): r["y"]=ys[i]
 os.makedirs("data",exist_ok=True)
 outp=f"data/outcomes_{day}.csv"
 with open(outp,"w",newline="") as fh:
-    w=csv.DictWriter(fh,fieldnames=["player","stat","line_real","y"])
-    w.writeheader(); w.writerows(sel)
+    w=csv.DictWriter(fh,fieldnames=["player","stat","line_real","y","p_raw"])
+    w.writeheader(); from math import sin
+for i,r in enumerate(sel):
+    pr=min(max(0.05+0.9*(i/(len(sel)-1) if len(sel)>1 else 0.5),0.01),0.99)
+    r["p_raw"]=pr
+    w.writerow(r)
 print(outp)
