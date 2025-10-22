@@ -58,6 +58,10 @@ jobs:
         || true
 
         ${PY:-python3} scripts/outcomes_rollup.py --days 30'
+    - name: Ensure joined day
+      if: always()
+      continue-on-error: true
+      run: ${PY:-python3} scripts/ci_ensure_joined_day.py || true
     - name: Rollup probe
       run: python scripts/rollup_probe.py --day "$DAY" --out "rollup_probe_${DAY}.json"
     - name: Upload rollup_probe
