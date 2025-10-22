@@ -64,10 +64,10 @@ def write_outcomes(day, rows):
         for i,r in rows:
             pr=r.get("p_raw")
             if pr is None:
-                pr=0.1+0.8*(i/(n-1) if n>1 else 0.5)
+                pr=0.2+0.6*(i/(n-1) if n>1 else 0.5)
                 if pr<0.05: pr=0.05
                 if pr>0.95: pr=0.95
-            y=1 if pr>=0.5 else 0
+            y=1 if pr>=0.6 else 0
             w.writerow({"player":r.get("player",""),"stat":r.get("stat","PTS"),"line_real":r.get("line_real",""),"y":y,"p_raw":pr})
     print(outp)
 def main():
