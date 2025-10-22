@@ -251,3 +251,21 @@ def load_calibration(day: str):
         except Exception:
             pass
     return None
+
+def synth_edges_from_realized(realized, day):
+    recs=[]
+    for _,r in realized.iterrows():
+        recs.append({
+            "day":day,
+            "player":r.get("player",""),
+            "stat":r.get("stat","PTS"),
+            "line_edge":r.get("line_real", float("nan")),
+            "p_raw": r.get("p_raw_realized", float("nan")),
+            "payout": 2.0,
+            "tier":"synth",
+            "player_key": canon_player(r.get("player","")),
+            "stat_key": canon_stat(r.get("stat",""))
+        })
+    import pandas as pd
+    df=pd.DataFrame(recs)
+    return df
