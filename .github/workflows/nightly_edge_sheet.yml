@@ -146,6 +146,16 @@ jobs:
         name: outcomes_rollup
         path: outcomes_rollup
         if-no-files-found: warn
+    - name: Join advisory
+      if: always()
+      run: ${PY:-python3} scripts/ci_join_advisory.py || true
+    - name: Upload join advisory
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: join_advisory
+        path: join_advisory.json
+        if-no-files-found: warn
     - name: Model parity (post)
       if: always()
       run: 'if test -s model_v2.pkl; then printf ''{"state":"present","path":"model_v2.pkl"}
