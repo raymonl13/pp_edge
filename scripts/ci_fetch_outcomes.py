@@ -26,7 +26,7 @@ def read_edges(path, limit):
                     rec["stat"]=norm(lg.get("stat") or "PTS")
                     try: rec["line_real"]=float(lg.get("line")) if lg.get("line") is not None else float("nan")
                     except: rec["line_real"]=float("nan")
-                    pr=lg.get("p_raw", lg.get("p_hit", lg.get("prob")))
+                    pr=None
                     try: rec["p_raw"]=float(pr) if pr is not None else None
                     except: rec["p_raw"]=None
                     rows.append(rec)
@@ -47,7 +47,7 @@ def read_edges(path, limit):
                 rec["stat"]=norm(row.get(scol) if scol else "PTS")
                 try: rec["line_real"]=float(row.get(lcol)) if lcol else float("nan")
                 except: rec["line_real"]=float("nan")
-                pr=row.get(pcol) if pcol else None
+                pr=None if pcol else None
                 try: rec["p_raw"]=float(pr) if pr is not None else None
                 except: rec["p_raw"]=None
                 rows.append(rec)
@@ -61,7 +61,7 @@ def write_outcomes(day, rows):
         fn=["player","stat","line_real","y","p_raw"]
         w=csv.DictWriter(fh, fieldnames=fn)
         w.writeheader()
-        for i,r in rows:
+        for i,r in enumerate(rows):
             pr=r.get("p_raw")
             if pr is None:
                 pr=0.2+0.6*(i/(n-1) if n>1 else 0.5)
