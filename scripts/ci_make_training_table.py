@@ -2,6 +2,31 @@
 import argparse, csv, json, os, sys, glob, unicodedata, datetime, re, ast
 from typing import List, Dict, Optional, Tuple
 import pandas as pd
+
+def _csv_has_rows(path):
+    try:
+        with open(path,'r') as fh:
+            for i,_ in enumerate(fh,1):
+                if i>1:
+                    return True
+        return False
+    except Exception:
+        return False
+
+def find_file_nonempty(candidates):
+    picks=[]
+    empties=[]
+    for pattern in candidates:
+        matches = sorted(glob.glob(pattern))
+        for m in matches:
+            if _csv_has_rows(m):
+                picks.append(m)
+            else:
+                empties.append(m)
+    if picks:
+        return picks[0]
+    return empties[0] if empties else None
+
 import numpy as np
 STAT_ALIASES={"PTS":"PTS","POINTS":"PTS","REB":"REB","REBOUNDS":"REB","AST":"AST","ASSISTS":"AST","3PM":"3PM","THREES":"3PM","3PTM":"3PM","3PMADE":"3PM","3P_MADE":"3PM","HR":"HR","HRS":"HR","HOMERUNS":"HR","HOME_RUNS":"HR","SO":"SO","K":"SO","STRIKEOUTS":"SO","H":"H","HITS":"H","R":"R","RUNS":"R","RBI":"RBI","SB":"SB","STEALS":"SB","BB":"BB","WALKS":"BB","SOG":"SOG","SHOTS_ON_GOAL":"SOG"}
 def _strip_accents(s): return ''.join(c for c in unicodedata.normalize('NFKD', s) if not unicodedata.combining(c))
