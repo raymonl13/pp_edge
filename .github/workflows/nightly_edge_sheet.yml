@@ -37,6 +37,9 @@ jobs:
       if: always()
       continue-on-error: true
       run: ${PY:-python3} scripts/ci_rescue_pre.py || true
+    - name: Inspect rescued day (pre)
+      if: always()
+      run: ${PY:-python3} scripts/ci_inspect_pre.py || true
     - name: Upload edgesheet
       uses: actions/upload-artifact@v4
       with:
