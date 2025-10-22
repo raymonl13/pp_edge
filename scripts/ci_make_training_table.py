@@ -190,7 +190,7 @@ def join_one_day(day,outdir):
         y=match.get("y",np.nan) if not match.empty else np.nan
         status="won" if y==1 else ("lost" if y==0 else "pending")
         line_real=match.get("line_real",np.nan) if not match.empty else np.nan
-        rows.append({"day":day,"player":r.get("player",""),"stat":r.get("stat",""),"line_edge":r.get("line_edge",np.nan),"line_real":line_real,"p_raw":r.get("p_raw",np.nan),"p_cal":np.nan,"payout":r.get("payout",np.nan),"y":y,"status":status,"collision":bool(collision),"player_key":pk,"stat_key":sk})
+        rows.append({"day":day,"player":r.get("player",""),"stat":r.get("stat",""),"line_edge":r.get("line_edge",np.nan),"line_real":line_real,"p_raw":r.get("p_raw",np.nan), "p_raw_realized": match.get("p_raw_realized", np.nan),"p_cal":np.nan,"payout":r.get("payout",np.nan),"y":y,"status":status,"collision":bool(collision),"player_key":pk,"stat_key":sk})
     df=pd.DataFrame(rows)
     df["p_cal"]=apply_calibration(df["p_raw"],calib)
     df["profit_units"]=np.where(df["y"].isin([0,1]),df["y"]*df["payout"]-1.0,np.nan)
