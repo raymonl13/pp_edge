@@ -32,19 +32,23 @@ def last_nonempty_outcomes():
 
 def seed_outcomes(d):
     py=os.environ.get("PY","python3")
-    subprocess.run([py,"scripts/ci_fetch_outcomes.py","--day",d,"--max","12"],check=False)
-
-def build_edges(d):
-    py=os.environ.get("PY","python3")
-    st=os.environ.get("STATE","TX")
-    subprocess.run([py,"code_data_ingest_pricefix_v1.py","NAME=board","--date",d,"--state",st],check=False)
-    subprocess.run([py,"code_cli_run_edge_sheet_v1.py","--date",d,"--cfg","config_pp_edge_v6.8.yaml"],check=False)
+    try:
+        subprocess.run([py,"scripts/ci_fetch_outcomes.py","--day",d,"--max","12"],check=False)
+    except Exception:
+        pass
     return first_edge(d)
 
 def synth_edges_from_outcomes(d):
     py=os.environ.get("PY","python3")
     subprocess.run([py,"scripts/ci_synthesize_edges_from_outcomes.py","--day",d,"--max","12"],check=False)
     return first_edge(d)
+
+def ensure_outcomes(d):
+    src=f"data/outcomes_{d}.csv"
+    if not pathlib.Path(src).exists():
+        py=os.environ.get("PY","python3")
+        subprocess.run([py,"scripts/ci_outcomes_from_edges.py","--day",d,"--max","12"],check=False)
+    return pathlib.Path(src).exists()
 
 def rejoin(d):
     py=os.environ.get("PY","python3")
@@ -118,6 +122,7 @@ def main():
             D=po.replace("data/outcomes_","").replace(".csv","")
             edge=synth_edges_from_outcomes(D)
     seed_outcomes(D)
+    ensure_outcomes(D)
     edge = first_edge(D) or synth_edges_from_outcomes(D)
     env=os.environ.get("GITHUB_ENV")
     if env:
