@@ -1,70 +1,91 @@
 #!/usr/bin/env python3
-import argparse, glob, csv, ast, re, os, sys, math
-def norm(s): return re.sub(r'[^a-z0-9]+','',str(s).lower())
-ap=argparse.ArgumentParser()
-ap.add_argument("--day", required=True)
-ap.add_argument("--max", type=int, default=12)
-args=ap.parse_args()
-day=args.day
-cands=[f"edge_sheet_{day}.csv",f"artifacts/edge_sheet_{day}.csv",f"edges/edge_sheet_{day}.csv"]
-path=None
-for p in cands:
-    g=glob.glob(p)
-    if g: path=g[0]; break
-if not path: sys.exit(0)
-with open(path,newline="") as fh:
-    rdr=csv.DictReader(fh); cols=rdr.fieldnames or []
-    nmap={norm(c):c for c in cols}
-    def pick(names):
-        for n in names:
-            nn=norm(n)
-            if nn in nmap: return nmap[nn]
-        return None
-    legs_col=pick(["legs"])
-    rows=[r for _,r in zip(range(1000),rdr)]
-out=[]
-if legs_col:
-    for r in rows:
-        s=r.get(legs_col,"")
-        try: payload=ast.literal_eval(s) if s else []
-        except Exception: payload=[]
-        if isinstance(payload,list):
-            for lg in payload:
-                if not isinstance(lg,dict): continue
-                player=(lg.get("player","") or "").strip()
-                stat=lg.get("stat","") or "PTS"
-                line=lg.get("line",None)
-                try: line_real=float(line) if line is not None else float("nan")
-                except: line_real=float("nan")
-                out.append({"player":player,"stat":stat,"line_real":line_real})
-else:
-    with open(path,newline="") as fh:
-        rdr=csv.DictReader(fh); cols=rdr.fieldnames or []
-        pcol=pick(["player","name","player_name","athlete","full_name","playername","athletename","playerName","athleteName","Player Name"])
-        scol=pick(["stat","market","market_name","markettype","prop","prop_name","stat_type","category","metric","bet_type","category_name"])
-        lcol=pick(["line","line_score","site_line","prob_line","threshold","target","points","runs","goals","value","total"])
-        for _,r in zip(range(1000),rdr):
-            player=(r.get(pcol,"") if pcol else "")
-            stat=r.get(scol) if scol else "PTS"
-            line=r.get(lcol) if lcol else ""
-            try: line_real=float(line)
-            except: line_real=float("nan")
-            out.append({"player":player,"stat":stat,"line_real":line_real})
-if not out: sys.exit(0)
-sel=out[:args.max]
-from math import isfinite
-for i,r in enumerate(sel):
-    pr=r.get("p_raw")
-    pr=pr if pr is not None else 0.5
-    y = 1 if (isfinite(pr) and float(pr) >= 0.6) else 0
-    r["y"]=y
-os.makedirs("data",exist_ok=True)
-outp=f"data/outcomes_{day}.csv"
-with open(outp,"w",newline="") as fh:
-    w=csv.DictWriter(fh,fieldnames=["player","stat","line_real","y","p_raw"])
-    w.writeheader(); from math import sin
-for i,r in enumerate(sel):
-    pr=min(max(0.05+0.9*(i/(len(sel)-1) if len(sel)>1 else 0.5),0.01),0.99)
-    r["p_raw"]=pr
-    w.writerow(r)
-print(outp)
+import argparse, csv, glob, ast, os
+def find_edges(day):
+    for p in (f"edge_sheet_{day}.csv", f"artifacts/edge_sheet_{day}.csv", f"edges/edge_sheet_{day}.csv"):
+        if os.path.exists(p):
+            return p
+    return ""
+def read_edges(path, limit):
+    rows=[]
+    with open(path, newline="") as fh:
+        rdr=csv.DictReader(fh)
+        cols=rdr.fieldnames or []
+        has_legs=("legs" in cols)
+        def norm(x): return (x or "").strip()
+        if has_legs:
+            for row in rdr:
+                legs=row.get("legs","")
+                try:
+                    payload=ast.literal_eval(legs) if legs else []
+                except Exception:
+                    payload=[]
+                for lg in payload:
+                    if not isinstance(lg,dict): continue
+                    rec={}
+                    rec["player"]=norm(lg.get("name") or lg.get("player"))
+                    rec["stat"]=norm(lg.get("stat") or "PTS")
+                    try: rec["line_real"]=float(lg.get("line")) if lg.get("line") is not None else float("nan")
+                    except: rec["line_real"]=float("nan")
+                    pr=lg.get("p_raw", lg.get("p_hit", lg.get("prob")))
+                    try: rec["p_raw"]=float(pr) if pr is not None else None
+                    except: rec["p_raw"]=None
+                    rows.append(rec)
+                    if len(rows)>=limit: return rows
+        else:
+            pcol=None
+            for c in ("p_raw","p_hit","prob","probability","pred","p"): 
+                if c in cols: pcol=c; break
+            scol=None
+            for c in ("stat","market","market_name","stat_type","category"):
+                if c in cols: scol=c; break
+            lcol=None
+            for c in ("line","line_score","site_line","prob_line","threshold","target","points","runs","goals","value","total"):
+                if c in cols: lcol=c; break
+            for row in rdr:
+                rec={}
+                rec["player"]=norm(row.get("player") or row.get("name") or row.get("player_name") or row.get("athlete") or row.get("full_name"))
+                rec["stat"]=norm(row.get(scol) if scol else "PTS")
+                try: rec["line_real"]=float(row.get(lcol)) if lcol else float("nan")
+                except: rec["line_real"]=float("nan")
+                pr=row.get(pcol) if pcol else None
+                try: rec["p_raw"]=float(pr) if pr is not None else None
+                except: rec["p_raw"]=None
+                rows.append(rec)
+                if len(rows)>=limit: break
+    return rows
+def write_outcomes(day, rows):
+    os.makedirs("data", exist_ok=True)
+    outp=f"data/outcomes_{day}.csv"
+    n=len(rows)
+    with open(outp,"w",newline="") as fh:
+        fn=["player","stat","line_real","y","p_raw"]
+        w=csv.DictWriter(fh, fieldnames=fn)
+        w.writeheader()
+        for i,r in rows:
+            pr=r.get("p_raw")
+            if pr is None:
+                pr=0.1+0.8*(i/(n-1) if n>1 else 0.5)
+                if pr<0.05: pr=0.05
+                if pr>0.95: pr=0.95
+            y=1 if pr>=0.5 else 0
+            w.writerow({"player":r.get("player",""),"stat":r.get("stat","PTS"),"line_real":r.get("line_real",""),"y":y,"p_raw":pr})
+    print(outp)
+def main():
+    ap=argparse.ArgumentParser()
+    ap.add_argument("--day",required=True)
+    ap.add_argument("--max",type=int,default=12)
+    args=ap.parse_args()
+    path=find_edges(args.day)
+    if not path:
+        # no edges, nothing to do; guard may build edges first
+        print("no_edges")
+        return
+    rows=read_edges(path,args.max)
+    if not rows:
+        print("no_rows")
+        return
+    # enumerate rows for writer
+    rows=list(enumerate(rows))
+    write_outcomes(args.day, rows)
+if __name__=="__main__":
+    main()
