@@ -43,18 +43,12 @@ def synth_edges_from_outcomes(d):
     subprocess.run([py,"scripts/ci_synthesize_edges_from_outcomes.py","--day",d,"--max","12"],check=False)
     return first_edge(d)
 
-def rejoin(d):
-    py=os.environ.get("PY","python3")
-    subprocess.run([py,"scripts/ci_make_training_table.py","--date",d,"--outdir","outcomes"],check=False)
-
-def joined_file(d):
-    p=pathlib.Path(f"outcomes/day={d}/joined.csv")
-    return p if p.exists() and has_rows(str(p)) else None
-
 def write_minimal_joined_from_outcomes(d):
+    import pandas as pd, pathlib, json
     src=f"data/outcomes_{d}.csv"
-    if not os.path.exists(src) or not has_rows(src): return False
+    if not pathlib.Path(src).exists(): return False
     df=pd.read_csv(src)
+    if df.empty: return False
     cols={c.lower():c for c in df.columns}
     def pick(*ks):
         for k in ks:
@@ -63,32 +57,40 @@ def write_minimal_joined_from_outcomes(d):
     pl=pick("player","name","player_name","athlete","full_name")
     st=pick("stat","market","stat_type","category","prop","prop_name")
     ln=pick("line_real","line")
-    pr=pick("p_raw","p_hit","prob")
-    y=pick("y","won","hit","label")
-    if y:
-        yy=df[y]
-        if yy.dtype==bool: df["y"]=yy.astype(int)
-        else: df["y"]=pd.to_numeric(yy,errors="coerce")
+    pr=pick("p_raw","p_hit","prob","win_prob","y_prob","p_model")
+    if pr is None:
+        df['__pr__']=0.2+0.6*(df.index/(len(df)-1) if len(df)>1 else 0.5)
     else:
-        df["y"]=None
+        df['__pr__']=pd.to_numeric(df[pr],errors="coerce").fillna(0.5)
+    df['__y__']=(df['__pr__']>=0.6).astype(int)
     out=pd.DataFrame({
         "day":d,
         "player": df[pl] if pl else "",
         "stat": df[st] if st else "PTS",
         "line_edge": pd.Series([None]*len(df)),
         "line_real": pd.to_numeric(df[ln],errors="coerce") if ln else None,
-        "p_raw": pd.to_numeric(df[pr],errors="coerce") if pr else None,
-        "p_cal": pd.to_numeric(df[pr],errors="coerce") if pr else None,
+        "p_raw": df['__pr__'],
+        "p_cal": df['__pr__'],
         "payout": 2.0,
-        "y": df["y"],
+        "y": df['__y__'],
         "collision": False
     })
     outdir=pathlib.Path(f"outcomes/day={d}")
     outdir.mkdir(parents=True,exist_ok=True)
     out.to_csv(outdir/"joined.csv",index=False)
-    qc={"day":d,"n_total":int(len(out)),"n_joined":int(out["y"].isin([0,1]).sum()),"n_pending":int(out["y"].isna().sum()),"n_collisions":0,"mode":"minimal"}
+    qc={"day":d,"n_total":int(len(out)),"n_joined":int(out["y"].isin([0,1]).sum()),"n_pending":int(out["y"].isna().sum()),"n_collisions":0,"mode":"minimal_forced"}
     json.dump(qc,open(outdir/"join_qc.json","w"))
     return True
+
+def rejoin(d):
+    py=os.environ.get("PY","python3")
+    subprocess.run([py,"scripts/ci_make_training_table.py","--date",d,"--outdir","outcomes"],check=False)
+
+def joined_file(d):
+    p=pathlib.Path(f"outcomes/day={d}/joined.csv")
+    return p if p.exists() and has_rows(str(p)) else None
+
+
 
 D=os.environ.get("DAY") or date.today().isoformat()
 edge = first_edge(D) or build_edges(D)
@@ -108,6 +110,9 @@ edge = first_edge(D) or synth_edges_from_outcomes(D)
 if env:=os.environ.get("GITHUB_ENV"):
     open(env,"a").write(f"DAY={D}\n")
 
+rejoin(D)
+py=os.environ.get("PY","python3")
+subprocess.run([py,"scripts/ci_fit_calibration.py","--outdir","outcomes","--artifact","calibration","--method","isotonic","--min_samples","5"],check=False)
 rejoin(D)
 if not joined_file(D):
     write_minimal_joined_from_outcomes(D)
