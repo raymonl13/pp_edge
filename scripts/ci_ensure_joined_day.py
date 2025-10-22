@@ -62,7 +62,11 @@ if cov>0:
 target=day or datetime.utcnow().strftime("%Y-%m-%d")
 ep=edge_path(target) or build_edges(target)
 if not ep:
-    alt=latest_nonempty_edge_day()
+    py=os.environ.get('PY','python3')
+    subprocess.run([py,'scripts/ci_synthesize_edges_from_outcomes.py','--day',target,'--max','12'],check=False)
+    ep=edge_path(target)
+    if not ep:
+        alt=latest_nonempty_edge_day()
     if alt:
         target=alt
         ep=edge_path(target) or build_edges(target)
@@ -71,6 +75,8 @@ if not ep:
     sys.exit(0)
 
 seed_outcomes(target,"12")
+if not edge_path(target) or not has_rows(edge_path(target)):
+    subprocess.run([os.environ.get('PY','python3'),'scripts/ci_synthesize_edges_from_outcomes.py','--day',target,'--max','12'],check=False)
 rejoin_and_roll(target)
 cov2=joined_sum(14)
 print(f"ensure_joined_day target={target} joined_sum_after={cov2}")
