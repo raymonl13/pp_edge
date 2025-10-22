@@ -46,6 +46,8 @@ jobs:
 
         ${PY:-python3} scripts/ci_outcomes_backfill.py --days 14 --end "$DAY" > outcomes_dates.txt
 
+        ${PY:-python3} scripts/ci_outcomes_backfill.py --days 14 --end "$DAY" > outcomes_dates.txt
+
         while read -r d; do ${PY:-python3} scripts/ci_make_training_table.py --date
         "$d" || true; done < outcomes_dates.txt
 
