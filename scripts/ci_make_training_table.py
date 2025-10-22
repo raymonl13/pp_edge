@@ -176,7 +176,7 @@ def join_one_day(day,outdir):
         json.dump({"day":day,"n_total":0,"n_joined":0,"n_pending":0,"n_collisions":0,**meta},open(f"{outdir}/day={day}/join_qc.json","w"))
         return {"day":day,"n_total":0,"n_joined":0,"n_pending":0,"n_collisions":0,**meta}
     realized=discover_realized(day)
-    calib=None
+    calib = load_calibration(day)
     idx={}
     if realized is not None and not realized.empty:
         for (pk,sk),g in realized.groupby(["player_key","stat_key"]):
@@ -217,3 +217,12 @@ def main():
         print(f"ci_make_training_table day={d} n_total={qc['n_total']} n_joined={qc['n_joined']} n_pending={qc['n_pending']} n_collisions={qc['n_collisions']}")
     pd.DataFrame(totals).to_csv(f"{args.outdir}/join_counts.csv",index=False)
 if __name__=="__main__": main()
+
+def load_calibration(day: str):
+    for cand in [f"calibration_{day}.json", f"calibration/{day}.json", "calibration/latest.json", "calibration_global.json"]:
+        try:
+            with open(cand,"r") as fh:
+                return json.load(fh)
+        except Exception:
+            pass
+    return None
