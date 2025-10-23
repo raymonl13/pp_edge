@@ -39,6 +39,102 @@ jobs:
       run: ${PY:-python3} scripts/ci_rescue_pre.py || true
     - name: Assert joined exists (pre)
       run: test -s "outcomes/day=${{ env.DAY }}/joined.csv"
+    - name: Derive slips for bankroll
+      run: 'set -e
+
+        PY=${PY:-python3}
+
+        DAY="${{ env.EFFECTIVE_DAY }}"
+
+        $PY scripts/derive_slips_from_joined.py --day "$DAY" --joined "outcomes/day=$DAY/joined.csv"
+        --out "slips_manual.json" --odds_default 2.18'
+    - name: Bankroll decider
+      run: 'set -e
+
+        PY=${PY:-python3}
+
+        DAY="${{ env.EFFECTIVE_DAY }}"
+
+        $PY scripts/bankroll_from_yaml.py "$DAY"'
+    - name: Upload bankroll artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: bankroll_${{ env.EFFECTIVE_DAY }}
+        path: 'bankroll_decision.json
+
+          bankroll_summary.txt'
+    - name: Derive slips for bankroll
+      run: 'set -e
+
+        PY=${PY:-python3}
+
+        DAY="${{ env.EFFECTIVE_DAY }}"
+
+        $PY scripts/derive_slips_from_joined.py --day "$DAY" --joined "outcomes/day=$DAY/joined.csv"
+        --out "slips_manual.json" --odds_default 2.18'
+    - name: Bankroll decider
+      run: 'set -e
+
+        PY=${PY:-python3}
+
+        DAY="${{ env.EFFECTIVE_DAY }}"
+
+        $PY scripts/bankroll_from_yaml.py "$DAY"'
+    - name: Upload bankroll artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: bankroll_${{ env.EFFECTIVE_DAY }}
+        path: 'bankroll_decision.json
+
+          bankroll_summary.txt'
+    - name: Derive slips for bankroll
+      run: 'set -e
+
+        PY=${PY:-python3}
+
+        DAY="${{ env.EFFECTIVE_DAY }}"
+
+        $PY scripts/derive_slips_from_joined.py --day "$DAY" --joined "outcomes/day=$DAY/joined.csv"
+        --out "slips_manual.json" --odds_default 2.18'
+    - name: Bankroll decider
+      run: 'set -e
+
+        PY=${PY:-python3}
+
+        DAY="${{ env.EFFECTIVE_DAY }}"
+
+        $PY scripts/bankroll_from_yaml.py "$DAY"'
+    - name: Upload bankroll artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: bankroll_${{ env.EFFECTIVE_DAY }}
+        path: 'bankroll_decision.json
+
+          bankroll_summary.txt'
+    - name: Derive slips for bankroll
+      run: 'set -e
+
+        PY=${PY:-python3}
+
+        DAY="${{ env.EFFECTIVE_DAY }}"
+
+        $PY scripts/derive_slips_from_joined.py --day "$DAY" --joined "outcomes/day=$DAY/joined.csv"
+        --out "slips_manual.json" --odds_default 2.18'
+    - name: Bankroll decider
+      run: 'set -e
+
+        PY=${PY:-python3}
+
+        DAY="${{ env.EFFECTIVE_DAY }}"
+
+        $PY scripts/bankroll_from_yaml.py "$DAY"'
+    - name: Upload bankroll artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: bankroll_${{ env.EFFECTIVE_DAY }}
+        path: 'bankroll_decision.json
+
+          bankroll_summary.txt'
     - name: Inspect rescued day (pre)
       if: always()
       run: ${PY:-python3} scripts/ci_inspect_pre.py || true
