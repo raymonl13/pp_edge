@@ -1,0 +1,11 @@
+bankroll:
+  amount: 10000
+  currency: USD
+  kelly_fraction: 0.25
+  min_stake: 1.0
+  round_step: 0.5
+rails:
+  daily_max_risk_pct: 0.03
+  per_slip_max_pct: 0.01
+  per_team_cap_pct: 0.02
+  per_game_cap_pct: 0.02
