@@ -203,6 +203,25 @@ def main():
 
     df["p_cal"] = apply_calibration(df.get("p_raw", pd.Series([np.nan]*len(df))), cal)
 
+    import json, os, numpy as np, pandas as pd
+
+    cal=None
+
+    for _cp in (f"calibration/{day}.json", "calibration/latest.json"):
+
+        if os.path.exists(_cp):
+
+            try:
+
+                cal=json.load(open(_cp)); break
+
+            except Exception:
+
+                pass
+
+    df["p_cal"]=apply_calibration(df.get("p_raw", pd.Series([float("nan")]*len(df))), cal)
+
+
     df.to_csv(f"{args.outdir}/day={day}/joined.csv", index=False)
     qc={"day":day,"n_total":int(len(df)),"n_joined":int(df["y"].isin([0,1]).sum()),"n_pending":int(df["y"].isna().sum()),"n_collisions":int(collisions),**meta}
     with open(f"{args.outdir}/day={day}/join_qc.json","w") as fh: json.dump(qc,fh)
