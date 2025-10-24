@@ -72,19 +72,27 @@ jobs:
 
         PY=${PY:-python3}
 
-        DAY="${{ env.EFFECTIVE_DAY }}"
+        DAY="${DAY:-${{ env.DAY }}}"
 
-        $PY scripts/derive_slips_from_joined.py --day "$DAY" --joined "outcomes/day=$DAY/joined.csv"
+        JP=""
+
+        for C in "outcomes/day=$DAY/joined.csv" "outcomes_data_download/day=$DAY/joined.csv"
+        "outcomes_data_pre_download/day=$DAY/joined.csv" "outcomes_data_post_download/day=$DAY/joined.csv";
+        do [ -s "$C" ] && JP="$C" && break; done
+
+        echo "joined_used=${JP:-NO_JOINED}"
+
+        $PY scripts/derive_slips_from_joined.py --day "$DAY" ${JP:+--joined "$JP"}
         --out "slips_manual.json" --odds_default 2.18 || true
 
-        if [ ! -s slips_manual.json ]; then echo "[]" > slips_manual.json; fi'
+        [ -s slips_manual.json ] || echo "[]" > slips_manual.json'
       shell: bash
     - name: Bankroll decider
       run: 'set -e
 
         PY=${PY:-python3}
 
-        DAY="${{ env.EFFECTIVE_DAY }}"
+        DAY="${DAY:-${{ env.DAY }}}"
 
         $PY scripts/bankroll_decider.py --inputs slips_manual.json --out bankroll_decision.json
         --day "$DAY" --currency USD --bankroll 10000 --kelly_fraction 0.25 --daily_max_risk_pct
@@ -95,7 +103,7 @@ jobs:
 
         import json,os
 
-        day=os.environ.get("EFFECTIVE_DAY","")
+        day=os.environ.get("DAY","")
 
         try: arr=json.load(open("bankroll_decision.json"))
 
@@ -115,7 +123,7 @@ jobs:
     - name: Upload bankroll artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: bankroll_${{ env.EFFECTIVE_DAY }}
+        name: bankroll_${{ env.DAY }}
         path: 'bankroll_decision.json
 
           bankroll_summary.txt'
