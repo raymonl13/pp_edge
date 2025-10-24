@@ -1,0 +1,27 @@
+bankroll:
+  amount: 10000.0
+  currency: USD
+  kelly_fraction: 0.25
+  min_stake: 1.0
+  round_step: 0.5
+rails:
+  daily_max_risk_pct: 0.03
+  per_slip_max_pct: 0.01
+  per_team_cap_pct: 0.02
+  per_game_cap_pct: 0.02
+cool_off:
+  psi_threshold: 0.20
+  consecutive_fail_count: 2
+  probe_path: scripts/drift_probe.json
+fields:
+  slip_id: slip_id
+  ev: ev_penalized
+  pwin: p_win
+  odds: odds
+  team_id: team_id
+  game_id: game_id
+derive:
+  p_cols: [p_cal, p_win, p_raw]
+  odds_col: odds
+  team_cols: [team_id, team, team_abbr, player_team, home, home_team, home_abbr]
+  game_cols: [game_id, matchup, event_id, game_key, schedule_key, game_code]
