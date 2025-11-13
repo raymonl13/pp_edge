@@ -1,0 +1,35 @@
+# NBA market configuration (v0.1)
+
+markets:
+  - id: points
+    provider_codes: ["PTS"]
+    stat_col: "pts"
+    description: "Points"
+  - id: rebounds
+    provider_codes: ["REB"]
+    stat_col: "reb"
+    description: "Rebounds"
+  - id: assists
+    provider_codes: ["AST"]
+    stat_col: "ast"
+    description: "Assists"
+  - id: threes
+    provider_codes: ["3PM", "3PTM"]
+    stat_col: "fg3m"
+    description: "3-Point Field Goals Made"
+  - id: pra
+    provider_codes: ["PRA"]
+    stat_col: "pts+reb+ast"
+    description: "Points + Rebounds + Assists"
+
+feature_sets:
+  - id: nba_core_v0
+    applies_to: ["points","rebounds","assists","threes","pra"]
+    features:
+      - mp_last3
+      - mp_last10
+      - usage_last10
+      - team_pace_last10
+      - pts_last5
+      - reb_last5
+      - ast_last5
