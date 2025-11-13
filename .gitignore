@@ -42,3 +42,12 @@ artifacts/
 !docs/*.yml
 realized/
 !realized/*.csv
+
+# macOS noise
+.DS_Store
+
+# CI artifacts / local outputs
+ci_artifacts_*/
+ci_*/
+artifacts/
+runs/*/.DS_Store
