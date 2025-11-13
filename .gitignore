@@ -42,3 +42,48 @@ artifacts/
 !docs/*.yml
 realized/
 !realized/*.csv
+
+# macOS noise
+.DS_Store
+
+# CI artifacts / local outputs
+ci_artifacts_*/
+ci_*/
+artifacts/
+runs/*/.DS_Store
+
+# macOS noise
+.DS_Store
+
+# CI artifacts / local outputs
+ci_artifacts_*/
+ci_*/
+artifacts/
+runs/*/.DS_Store
+runs/*/snapshot/
+
+# Dashboard & misc local state (tune as needed)
+dashboard_v3/.DS_Store
+data/.DS_Store
+tests/.DS_Store
+.github/.DS_Store
+scripts/.DS_Store
+handoff/.DS_Store
+
+# macOS noise
+.DS_Store
+
+# CI artifacts / local outputs
+ci_artifacts_*/
+ci_*/
+artifacts/
+runs/*/.DS_Store
+runs/*/snapshot/
+
+# Dashboard & misc local state (tune as needed)
+dashboard_v3/.DS_Store
+data/.DS_Store
+tests/.DS_Store
+.github/.DS_Store
+scripts/.DS_Store
+handoff/.DS_Store
