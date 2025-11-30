@@ -1,55 +1,147 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+"""
+SlipBuilder v2 — NBA v0.1 hotfix profile
+
+- Allows same-game legs (no game_id ban).
+- Hard guard: NO duplicate player in a slip.
+- Optional soft limits read from cfg dict (if present), but default permissive.
+- Builds Power6 first, then Power4 (greedy, top-down by edge).
+"""
+
+from typing import Any, Dict, List, Iterable
 from itertools import combinations
-from math import prod
-from typing import Any, Dict, List, Tuple
+
+def _player_key(leg: Dict[str, Any]) -> str:
+    # accept either "player_name" or "player"
+    return (leg.get("player_name") or leg.get("player") or "").strip().lower()
+
+def _team(leg: Dict[str, Any]) -> str:
+    return (leg.get("team") or "").strip().upper()
+
+def _odds_type(leg: Dict[str, Any]) -> str:
+    return (leg.get("odds_type") or "").strip().lower()
 
 class SlipBuilder:
-    _ORDER: Tuple[Tuple[str, int], ...] = (
-        ("Power6", 6), ("Power4", 4), ("Power3", 3), ("Power2", 2),
-        ("Flex6", 6), ("Flex5", 5), ("Flex4", 4)
-    )
-    def __init__(self, cfg: Dict[str, Any], *, demons_used_today: int = 0):
-        self.div = cfg["diversification"]
-        self.pouts = cfg["payouts"]
-        self.demons_used_today = demons_used_today
-        self._active = [p for p in self._ORDER if p[0] in self.pouts]
-    def build_slips(self, legs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        slips, pool = [], sorted(legs, key=lambda l: l["edge_pp"], reverse=True)
-        while True:
-            made = False
-            for s_type, n in self._active:
-                slip = self._try_make(pool, s_type, n)
-                if slip:
-                    slips.append(slip)
-                    pool = [l for l in pool if l not in slip["legs"]]
-                    made = True
-                    break
-            if not made:
-                break
-        return slips
-    def _try_make(self, pool: List[Dict[str, Any]], s_type: str, n: int):
-        if len(pool) < n:
-            return None
-        for combo in combinations(pool, n):
-            if self._valid(combo):
-                return {"slip_type": s_type, "legs": list(combo),
-                        "edge_pp": round(self._edge(combo, s_type), 4),
-                        "stake_total": None}
-        return None
-    def _valid(self, combo) -> bool:
-        if len({l["player"] for l in combo}) < len(combo):
-            return False
-        demons = [l for l in combo if l.get("tag") == "Demon"]
-        if len(demons) > self.div["demon_quota_per_slip"]:
-            return False
-        if self.demons_used_today + len(demons) > self.div["demon_quota_per_day"]:
-            return False
-        games = [l.get("game_id") for l in combo if l.get("game_id")]
-        if len(games) != len(set(games)):
-            return False
+    def __init__(self, cfg: Optional[Dict[str, Any]] = None) -> None:
+        cfg = cfg or {}
+        nba_cfg = (cfg.get("nba") or {})
+        div = (nba_cfg.get("diversification") or {})
+        # Permissive defaults for v0.1
+        self.max_same_team_per_slip = int(div.get("max_same_team_per_slip", 6))
+        self.max_demon_per_slip     = int(div.get("max_demon_per_slip", 6))
+        self.max_goblin_per_slip    = int(div.get("max_goblin_per_slip", 6))
+        self.allow_same_game        = bool(div.get("allow_same_game", True))
+        self.max_slips              = int(nba_cfg.get("max_slips", 3))
+        self.target_leg_counts      = nba_cfg.get("target_leg_counts", [6, 4])
+
+    def _valid(self, combo: List[Dict[str, Any]]) -> bool:
+        seen_players = set()
+        team_counts: Dict[str, int] = {}
+        tier_counts = {"demon": 0, "goblin": 0}
+
+        for leg in combo:
+            pk = _player_key(leg)
+            if not pk:
+                return False
+            if pk in seen_players:
+                return False
+            seen_players.add(pk)
+
+            t = _team(leg)
+            if t:
+                team_counts[t] = team_counts.get(t, 0) + 1
+                if team_counts[t] > self.max_same_team_per_slip:
+                    return False
+
+            tier = _odds_type(leg)
+            if tier in tier_counts:
+                tier_counts[tier] += 1
+                if tier == "demon" and tier_counts[tier] > self.max_demon_per_slip:
+                    return False
+                if tier == "goblin" and tier_counts[tier] > self.max_goblin_per_slip:
+                    return False
+
+        # game correlation: v0.1 allows same-game; if you ever want to ban, enforce here.
         return True
-    def _edge(self, combo, s_type: str) -> float:
-        pouts = self.pouts[s_type]
-        if isinstance(pouts, (int, float)):
-            return prod(l["p_hit"] for l in combo) * pouts - 1.0
-        prob_all = prod(l["p_hit"] for l in combo)
-        return prob_all * pouts[max(pouts, key=pouts.get)] - 1.0
+
+    def build(self, legs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        # Sort candidates by descending edge (fall back to p_hit if present)
+        def edge(leg: Dict[str, Any]) -> float:
+            try:
+                return float(leg.get("edge_pp", leg.get("p_hit", 0.5) - 0.5))
+            except Exception:
+                return 0.0
+
+        ranked = sorted(legs, key=edge, reverse=True)
+        slips: List[Dict[str, Any]] = []
+
+        for L in self.target_leg_counts:
+            # Greedy pre-screen: keep top ~80 legs to bound search
+            pool = ranked[:80] if len(ranked) > 80 else ranked
+            # Quick greedy attempt: walk down and pick first L unique players
+            greedy: List[Dict[str, Any]] = []
+            seen = set()
+            for leg in pool:
+                pk = _player_key(leg)
+                if not pk or pk in seen:
+                    continue
+                greedy.append(leg)
+                seen.add(pk)
+                if len(greedy) == L:
+                    break
+            if len(greedy) == L and self._valid(greedy):
+                slips.append(_slip_from_legs(greedy, L))
+                if len(slips) >= self.max_slips:
+                    break
+                # continue searching other L sizes as configured
+
+            # If greedy didn’t hit, try limited combinations across top subset
+            top_for_combo = pool[:30]  # bound combinatorics
+            for combo in combinations(top_for_combo, L):
+                combo = list(combo)
+                if self._valid(combo):
+                    slips.append(_slip_from_legs(combo, L))
+                    if len(slips) >= self.max_slips:
+                        break
+            if len(slips) >= self.max_slips:
+                break
+
+        return slips
+
+def _slip_from_legs(legs: List[Dict[str, Any]], L: int) -> Dict[str, Any]:
+    # simple aggregate edge: sum of leg edges
+    E = 0.0
+    for leg in legs:
+        try:
+            E += float(leg.get("edge_pp", float(leg.get("p_hit", 0.5)) - 0.5))
+        except Exception:
+            pass
+    summary = "; ".join([
+        f"{leg.get('player_name') or leg.get('player','?')} "
+        f"({leg.get('team','')}) {leg.get('market','')} {leg.get('line','')}"
+        for leg in legs
+    ])
+    return {
+        "slip_type": f"Power{L}",
+        "edge_pp": round(E, 6),
+        "stake_total": "",
+        "num_legs": L,
+        "legs": legs,
+        "legs_summary": summary,
+    }
+
+# ---- Backward-compat shim so wrappers can always call `build_slips` ----
+try:
+    # If SlipBuilder doesn't expose build_slips, alias to any known builder.
+    if not hasattr(SlipBuilder, "build_slips"):
+        def _build_slips_shim(self, legs):
+            for name in ("build_slips", "build", "generate_slips", "generate", "__call__"):
+                fn = getattr(self, name, None)
+                if callable(fn):
+                    return fn(legs)
+            raise AttributeError("SlipBuilder lacks a build/generate method.")
+        SlipBuilder.build_slips = _build_slips_shim  # type: ignore[attr-defined]
+except Exception:
+    # Don't make import fail if something odd happens
+    pass
