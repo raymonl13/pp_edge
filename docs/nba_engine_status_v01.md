@@ -9,15 +9,21 @@ It does **not** try to record history; only “what is true today.”
 
 ---
 
-## 1. Lanes
+## 1. Lanes & Chat Roles
 
 - **Lane A (“Production”)**
-  - Used by the Daily SLP flow.
+  - Used by the **Daily SLP** flow.
   - Conservative, documented, and trusted.
+  - Daily SLP should only use Lane A scripts and behaviors unless explicitly told
+    (from an Engine thread) that something experimental has been promoted.
 
 - **Lane B (“Experimental”)**
-  - Used for side-by-side experiments (new models, thresholds, EV logic, etc.).
-  - Nothing in Lane B is assumed to be correct until promoted.
+  - Used in “NBA Engine” design chats.
+  - Hosts new models, EV logic, filters, and bankroll experiments.
+  - Nothing in Lane B is assumed to be correct until:
+    - Code is QA’d on real slates.
+    - This status doc is updated.
+    - A new git tag is created.
 
 ---
 
@@ -35,7 +41,7 @@ It does **not** try to record history; only “what is true today.”
   - Output:
     - `runs/nba/<DAY>/joined_<DAY>.csv`
 
-- Add stub/model probabilities:
+- Add model probabilities:
   - `scripts/nba/add_p_hit_v1.py`
   - Input:
     - `runs/nba/<DAY>/joined_<DAY>.csv`
@@ -43,7 +49,7 @@ It does **not** try to record history; only “what is true today.”
     - `runs/nba/<DAY>/joined_with_phit_<DAY>.csv`
   - Adds:
     - `p_hit` (per-leg P(actual_points > line))
-    - `edge_pp = p_hit - 0.5`
+    - `edge_pp = p_hit - 0.5` (crude edge proxy)
 
 - ESPN labeler:
   - `scripts/nba/build_points_train_from_espn_v0.py`
@@ -52,6 +58,8 @@ It does **not** try to record history; only “what is true today.”
   - Outputs:
     - Labeled rows: `data/nba/modeling/daily/points_train_<DAY>.csv`
     - Unmatched rows: `data/nba/modeling/unmatched/unmatched_points_<DAY>.csv`
+  - Completed for multiple Points days; days with very low match_rate (e.g., 2025-11-16, 11-18) are
+    quarantined from training.
 
 - Coverage reporting:
   - `scripts/nba/report_training_days_v0.py`
@@ -74,15 +82,16 @@ It does **not** try to record history; only “what is true today.”
   - `data/nba/modeling/points_train_v1.csv`
   - ~1,661 labeled Points props across days:
     - 2025-11-13, 2025-11-19, 2025-11-21, 2025-11-24, 2025-11-25
-  - **Excluded from training:** 2025-11-16, 2025-11-18 (moved to `data/nba/modeling/daily_low_coverage/`)
+  - **Excluded from training (low coverage / mapping issues):**
+    - 2025-11-16, 2025-11-18 (moved to `data/nba/modeling/daily_low_coverage/`)
 
 - Model type:
   - Custom logistic regression implemented in `code_utils_model_v1.py`
-  - **Features (v1):** `line` only
+  - **Features (v1):** `line` only (context-free)
 
 - Outputs (added by `add_p_hit_v1.py`):
   - `p_hit`: estimated P(actual_points > line)
-  - `edge_pp = p_hit - 0.5` (crude edge proxy)
+  - `edge_pp = p_hit - 0.5` (crude edge proxy; not payout-aware)
 
 ---
 
@@ -124,6 +133,8 @@ It does **not** try to record history; only “what is true today.”
     - `runs/nba/<DAY>/slips_nba_v0_sized_filtered.csv`
   - A-set = filtered slips; unfiltered = full slip set.
 
+Daily SLP uses A-set slips as primary candidates today.
+
 ---
 
 ## 5. Evaluation & Reporting (Lane A)
@@ -131,8 +142,8 @@ It does **not** try to record history; only “what is true today.”
 - Slip-level eval:
   - `scripts/nba/eval_slips_nba_v0.py`
   - Inputs:
-    - `joined_with_phit_<DAY>.csv`
-    - `points_train_<DAY>.csv`
+    - `runs/nba/<DAY>/joined_with_phit_<DAY>.csv`
+    - `data/nba/modeling/daily/points_train_<DAY>.csv`
     - Slips CSV (unfiltered by default, or `--slips-file` for filtered slips)
   - Behavior:
     - Expands slip legs
@@ -151,21 +162,37 @@ It does **not** try to record history; only “what is true today.”
   - Output:
     - `data/nba/modeling/slip_filter_report_v0.csv`
 
+- **Full-board calibration (Lane B tooling, used by Engine thread):**
+  - `scripts/nba/eval_board_nba_v0.py`
+  - Inputs:
+    - `runs/nba/<DAY>/joined_with_phit_<DAY>.csv`
+    - `data/nba/modeling/daily/points_train_<DAY>.csv`
+  - Behavior:
+    - Evaluates calibration across the entire Points board (not just slip legs).
+    - Bins by p_hit, computes `avg_p_hit`, `actual_hit_rate`, `avg_edge_pp`, and Brier score.
+    - Provides optional breakdown by odds_type (standard/goblin/demon).
+  - Currently used in NB-F1 analysis to:
+    - Validate the per-leg band (0.52+).
+    - Flag demon props as a special risk quadrant.
+
 ---
 
 ## 6. Known Limitations (v0.1)
 
 - p_hit model v1:
   - Uses only `line` (no minutes, usage, opponent, pace, etc.).
-  - No separate models for other markets (3PM, PRA, Fantasy Score, etc.).
+  - Has not yet been systematically re-tuned using full-board calibration.
 
 - EV:
   - No explicit slip-level EV yet.
-  - `edge_pp = p_hit - 0.5` is only a crude proxy.
+  - `edge_pp = p_hit - 0.5` is only a crude proxy and ignores payout ladders.
 
 - odds_type (standard/goblin/demon):
   - Carried through as a column.
   - Not yet used for odds_type-aware EV or exposure caps.
+  - Early full-board calibration suggests:
+    - Goblin/standard props in 0.5–0.6 p_hit bands are often conservative or reasonable.
+    - Demon props can be significantly miscalibrated in those same bands on some days.
 
 - Bankroll:
   - Flat stake per slip.
@@ -179,11 +206,15 @@ It does **not** try to record history; only “what is true today.”
 
 ## 7. Next Planned Phase (Lane B / Design)
 
-- **NB-F1 – Full-board calibration & coverage gating**
-  - Implement `scripts/nba/eval_board_nba_v0.py` to:
-    - Merge the full board (Points) with labels.
-    - Bin by p_hit.
-    - Compare `avg_p_hit` vs `actual_hit_rate` and compute Brier score.
-  - Use F1 results to:
-    - Validate or adjust the `p_hit ≥ 0.52` band used in the filter.
-    - Identify trustworthy p_hit ranges and days for tuning.
+- **Current phase:** NB-F1 – Full-board calibration & coverage gating:
+  - `eval_board_nba_v0.py` implemented and run on several days.
+  - Results are being used to:
+    - Validate the 0.52 per-leg band.
+    - Identify trustworthy p_hit ranges and odds_type behavior.
+
+- **Next design phase:** NB-F2 – Points model v2 (feature-rich logistic + tree-based experiment):
+  - Define and implement a richer feature set for Points.
+  - Train v2 model(s) and compare to v1 using full-board calibration.
+  - Only promote v2 to Lane A when calibration/stability criteria are met.
+
+This status doc should be updated at the end of each phase (F1, F2, etc.), and a new tag (e.g., `nba-engine-v0.2`) should be created when behavior changes for Lane A.
