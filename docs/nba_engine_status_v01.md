@@ -1,5 +1,14 @@
 # NBA Engine Status — v0.1 (STATUS SNAPSHOT)
 
+<!-- BEGIN: PLANNED_POINTS_V2_FEATURE_SET_OPTION_A -->
+Planned Points v2 feature set (Option A, Lane B only):  
+Use joined_with_phit columns (line, stat_ppg, usagePercent, tsPercent, per, vorp, games, minutesPg, points, odds_type) + derived features (minutes_per_game, pts_per_min_season, line_minus_stat, line_over_stat, is_goblin, is_demon).  
+No Lane A changes until an F2 evidence pack is complete and we explicitly promote.
+<!-- END: PLANNED_POINTS_V2_FEATURE_SET_OPTION_A -->
+
+
+
+
 _Last updated: 2025-11-27_
 
 This document is the **current snapshot** of the NBA PrizePicks engine.

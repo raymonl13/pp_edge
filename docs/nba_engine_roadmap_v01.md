@@ -1,5 +1,22 @@
 # NBA Engine Roadmap — v0.1 (FAST-LANE)
 
+<!-- BEGIN: ROADMAP_CROSSWALK_M0_M7_TO_NB_F -->
+## Roadmap taxonomy crosswalk (canonical)
+
+Global milestones: M0–M7  
+NBA workstream: NB‑F0…NB‑F7
+
+Rule: every NB‑F phase must declare:
+- Roadmap anchor (M#)
+- Lane (A vs B)
+- Promotion gate (evidence pack + tag)
+- Dependencies (files/columns/scripts)
+
+<!-- END: ROADMAP_CROSSWALK_M0_M7_TO_NB_F -->
+
+
+
+
 _Last updated: 2025-11-27_
 
 This roadmap outlines the **fast-lane** build-out of the NBA PrizePicks engine.
@@ -123,6 +140,41 @@ Daily SLP uses this v1 + filter as the baseline engine today.
 ---
 
 ### NB-F2 – Points Model v2 (Feature-rich Logistic + Tree-based Experiment)
+
+<!-- BEGIN: NB_F2_POINTS_V2_FEATURES_OPTION_A -->
+#### Option A feature scope (use existing joined columns)
+
+Roadmap anchor: M5  
+Lane: B  
+Promotion gate: F2 evidence pack + tag (no Lane A changes until promoted)
+
+Exact column names available today (joined_with_phit):
+- line
+- stat_ppg
+- usagePercent
+- tsPercent
+- per
+- vorp
+- games
+- minutesPg
+- points
+- odds_type
+
+Derived features:
+- minutes_per_game = minutesPg / games
+- pts_per_min_season = points / minutesPg
+- line_minus_stat = line - stat_ppg
+- line_over_stat = line / max(stat_ppg, 1e-6)
+- is_goblin = (odds_type == "goblin")
+- is_demon  = (odds_type == "demon")
+
+Out of scope (Option A):
+- minutes_proj / pace_proj / home/rest flags (these are M2 “file-first features” work)
+
+<!-- END: NB_F2_POINTS_V2_FEATURES_OPTION_A -->
+
+
+
 
 **Goal:** Move from “line-only” p_hit to “context-aware” p_hit without sacrificing calibration.
 
